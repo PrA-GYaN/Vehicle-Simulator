@@ -1,0 +1,224 @@
+# ===========================================================================
+#  Simulation configuration
+#
+#  Angles in this file are in DEGREES for readability. They are converted to
+#  radians on load - the physics is radians-only. See src/core/Units.h.
+# ===========================================================================
+
+# Vehicle loaded at startup. Resolved as config/vehicles/<name>.yaml.
+# Override with --vehicle <name> on the command line.
+default_vehicle: ferrari_f40
+
+# Track built at startup.
+#
+#   test_track        point-to-point: straight, sweeper, slalom, return leg
+#   race_circuit      closed circuit built from straights and arcs
+#   apex_gp           the Apex Grand Prix Circuit: an original 4.9 km, 13-corner
+#                     layout with a pit lane and a complete venue - pits,
+#                     grandstands, barriers, scenery (see README, "The Apex
+#                     Grand Prix Circuit")
+#   nurburgring       the GP-Strecke, GENERATED from a centreline measured off
+#                     the reference scan (see tools/extract_track_centreline.cpp
+#                     and src/environment/data/NurburgringGpCentreline.h)
+#   nordschleife      the full 20.8 km Nordschleife, GENERATED from a
+#                     centreline measured off OpenStreetMap (see
+#                     tools/fetch_nordschleife_centreline.py and
+#                     src/environment/data/NordschleifeCentreline.h)
+#   straight          500 m of nothing, for acceleration and braking runs
+#   nurburgring_scan  the raw imported scan below, drawn as-is. The only track
+#                     with real elevation, and the only one with no centreline
+#                     of its own - so no kerbs, no start line, no lap distance.
+#
+# Override with --track <name> on the command line.
+default_track: apex_gp
+
+simulation:
+    # Which vehicle dynamics model to run.
+    #
+    #   four_wheel         four individual tyres. Tyre forces from the Magic
+    #                      Formula bounded by the friction circle, per-wheel
+    #                      vertical loads with longitudinal and lateral weight
+    #                      transfer, slip angles, slip ratios, sideslip, wheel
+    #                      lock and wheel spin.
+    #
+    #   kinematic_bicycle  the geometric model. The vehicle goes exactly where
+    #                      its wheels point: no forces, no slip, no sideslip,
+    #                      no grip limit. Kept because it is a valid
+    #                      description below roughly 15 mph, where steering
+    #                      geometry rather than grip limits path curvature
+    #                      (Blundell & Harty Section 7.3.2).
+    #
+    # Switchable at runtime in the Simulation panel; the state carries over, so
+    # the same manoeuvre can be run through both and compared.
+    dynamics_model: four_wheel
+
+    # Fixed physics timestep [s]. Physics advances in exact increments of this
+    # value regardless of frame rate, so the same inputs always produce the
+    # same trajectory. Typical values: 0.001, 0.005, 0.01, 0.02.
+    #
+    # The integrator is explicit Euler, so the error is first-order: halving
+    # this halves the integration error.
+    timestep: 0.01
+
+    # Simulated seconds per wall-clock second. 1.0 = real time, 0.25 = slow
+    # motion, 0 = frozen.
+    time_scale: 1.0
+
+    # true : physics is paced to wall-clock time with an accumulator.
+    # false: exactly one step per rendered frame, as fast as possible.
+    realtime: true
+
+    # Upper bound on physics steps executed per rendered frame. Guards against
+    # the 'spiral of death' after a stall: surplus simulated time is dropped
+    # rather than compounding.
+    max_steps_per_frame: 8
+
+# State restored by R / the Reset button.
+initial_state:
+    # Rear axle reference point [x, y, z] in metres. The kinematic bicycle
+    # model tracks the rear axle, not the CG - see physics/KinematicBicycleModel.h.
+    position: [0.0, 0.0, 0.0]
+
+    # Heading in degrees, measured from the +X axis. 0 points along +X, which
+    # is where the test track starts.
+    yaw: 0.0
+
+    velocity: 0.0   # [m/s]
+
+camera:
+    distance: 8.0       # [m] behind the vehicle
+    height: 4.0         # [m] above the vehicle
+    follow_speed: 5.0   # exponential smoothing rate [1/s]; higher is stiffer
+    look_ahead: 2.0     # [m] ahead of the vehicle the camera aims at
+    fov: 60.0           # [deg]
+
+    # Do not lower this without reading the note in src/config/Config.h. The
+    # circuit is built from near-coplanar layers; a small near plane spends
+    # all the depth buffer's precision on the first metre and the road surface
+    # starts losing to the grass beside it half a kilometre away.
+    near_plane: 0.5
+    far_plane: 2500.0
+
+# Actuator rates. These describe how fast the CONTROLS move, not how fast the
+# vehicle can go. A real steering system cannot step instantly.
+controls:
+    steering_rate: 180.0          # [deg/s] road wheel slew rate, turning in
+    steering_return_rate: 240.0   # [deg/s] returning to centre (usually faster)
+    throttle_rate: 2.0            # [1/s] 2.0 = 0.5 s from closed to full
+    brake_rate: 5.0               # [1/s]
+
+telemetry:
+    # Start recording immediately at launch.
+    enabled: false
+
+    # CSV files go here as run_001.csv, run_002.csv, ... Existing files are
+    # never overwritten; the next free number is used.
+    output_directory: logs
+
+    # Ring buffer size in samples. At 100 Hz, 60000 = 10 minutes.
+    max_samples: 60000
+
+# Scripted manoeuvre. Run from the UI, or with --experiment <type>.
+experiment:
+    # straight_line | constant_steering | step_steering
+    # acceleration_test | braking_test | slalom
+    type: constant_steering
+
+    initial_speed: 10.0    # [m/s] the vehicle is placed at this speed
+    steering_angle: 10.0   # [deg] road wheel angle; positive steers RIGHT
+    duration: 10.0         # [s]
+    step_time: 1.0         # [s] when the step is applied (step_steering, braking_test)
+    period: 3.0            # [s] slalom period
+
+    # Start this experiment automatically at launch.
+    auto_start: false
+
+# Environmental conditions used by the road load model (physics/RoadLoad.h).
+environment:
+    # Air density [kg/m^3]. 1.225 is the standard sea-level value at 15 C.
+    # Falls with altitude and temperature, which measurably reduces drag.
+    air_density: 1.225
+
+    # Road grade [deg], positive uphill. The current environment is flat, so
+    # this is 0; the term exists so adding terrain is a data change.
+    grade: 0.0
+
+    # Headwind component [m/s], positive opposes motion. A headwind adds to
+    # the airspeed the body sees (Gillespie Eq. 4-5).
+    headwind: 0.0
+
+# Real terrain scan used AS the driving environment when the
+# "nurburgring_scan" track is selected. Inert on every other track.
+#
+# NOTE: this is no longer how the Nurburgring is driven. The "nurburgring"
+# track is now generated from a centreline measured OFF this file by
+# tools/extract_track_centreline.cpp, which gives it everything a scan cannot
+# have - a start line, kerbs, runoff, barriers, lap distance, a real spawn
+# point - and does not need the 91 MB asset at runtime. The scan is kept
+# because it is the only environment in the project with genuine elevation,
+# and so the only one that exercises TerrainHeightField. See src/environment/TerrainHeightField.h for how this
+# becomes ground height for the physics (per-wheel quarter-car suspension,
+# physics/FourWheelModel.cpp), not just visuals.
+#
+# GEOMETRY IS MEASURED, NOT AUTHORED - see the axis note below - but the
+# spawn point is NOT: a raw terrain scan carries no drivable centreline for
+# any source to derive one from. Leave the `spawn:` block out to let the
+# application guess a flat patch near the model's centre at startup (logged
+# to the console); the guess is not a real driving line, just a place that
+# will not immediately launch the car off a cliff.
+environment_model:
+    path: "assets/models/nurburgring_gp.glb"
+
+    # MEASURED empirically, not guessed: loaded once per candidate axis and
+    # checked which one gives a WORLD-SPACE (i.e. after each node's own
+    # transform is applied, not a raw untransformed accessor bound - the
+    # scene has many nodes, each with its own transform, so only the former
+    # is meaningful) Y span in the tens-to-low-hundreds of metres, consistent
+    # with real elevation, rather thousands, which is the ground-plane
+    # footprint. +y wins clearly: [7.25, 161.50] m (154 m span) against
+    # +x/+z's 1200-2500 m spans - i.e. this asset IS glTF's own Y-up
+    # convention, the same one the GT3 model happened to use. "forward" is
+    # an arbitrary choice of one of the two ground-plane axes; a terrain
+    # scan has no inherent forward direction.
+    forward_axis: "+x"
+    up_axis: "+y"
+
+    # Uncomment and adjust after a look at the running scene:
+    # spawn:
+    #     position: [0.0, 0.0, 0.0]
+    #     yaw: 0.0
+
+# Engine, tyre and wind sound, synthesised from the physics (see
+# src/audio/SoundSynth.h) - no recordings. M mutes. A missing sound device
+# is not an error: the simulator just runs silent.
+audio:
+    enabled: true
+    master_volume: 0.8
+    sample_rate: 48000
+
+window:
+    width: 1600
+    height: 900
+    vsync: true
+
+# Android phone acting as a USB-connected controller (steering by tilt,
+# touch throttle/brake, handbrake). Transport is a TCP socket tunnelled
+# through ADB over the USB cable - see AndroidController/PROTOCOL.md.
+# Disabled by default so the feature never affects a keyboard-only setup.
+android_input:
+    enabled: true
+
+    # Both sides must agree on this. The simulator listens on
+    # 127.0.0.1:<port>; the phone connects to the same port on its own
+    # loopback, which `adb reverse` tunnels to this process.
+    port: 7788
+
+    # Seconds without a valid packet before the vehicle is forced to a safe
+    # state (throttle 0, brake 0, steering centred, handbrake off) and
+    # control falls back to keyboard input.
+    timeout_seconds: 0.5
+
+    # Run `adb reverse tcp:<port> tcp:<port>` automatically on startup.
+    # Best-effort - failure is logged, not fatal. Requires `adb` on PATH and
+    # the phone to have USB debugging authorised.
+    auto_adb_reverse: true

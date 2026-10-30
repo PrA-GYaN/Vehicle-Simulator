@@ -1,0 +1,256 @@
+# ===========================================================================
+#  Mercedes-AMG GT3 (Red Bull livery) - GT3-class race car, imported model.
+#
+#  This is the one vehicle config in the project whose GEOMETRY is not typed
+#  in by hand: wheelbase, front/rear track and wheel radius are MEASURED from
+#  the imported model's own wheel-hub nodes (assets/models/gt3_redbull.glb),
+#  not estimated. See the `model:` block at the bottom, and
+#  src/rendering/GltfModel.h for how the measurement is done.
+#
+#  Everything that is NOT visible in a 3D model - mass, CG position, tyre
+#  grip, spring rates - is still authored data, exactly as it is for the
+#  other three vehicles, and is sourced or flagged the same way. A GT3 car is
+#  further from the Knowledge Base's own worked examples than the road cars
+#  are (the KB is a passenger-car and light-race-car source, not a GT3 BoP
+#  document), so MORE fields here carry an "estimated" flag than in
+#  basic_car/sports_car/suv. None of them is a guess made up for this file
+#  specifically - each sits inside a range the KB itself states, using the
+#  same reasoning already established for sports_car.yaml's race-adjacent
+#  values, pushed further in the direction GT3 regulations and public
+#  knowledge of the class actually push a real one.
+# ===========================================================================
+
+vehicle:
+    name: "Mercedes-AMG GT3"
+
+    # GT3 regulations set a class MINIMUM weight (with driver and fuel),
+    # commonly around 1300 kg depending on Balance of Performance for a given
+    # event - not a Knowledge Base figure, since BoP is a sporting regulation,
+    # not physics. Authored at the commonly cited minimum.
+    mass: 1300.0
+
+    dimensions:
+        # Measured from the model's own world-space bounding box (excluding
+        # the wheels, which are handled separately): 4.650 x 2.052 x 1.256 m.
+        # Width includes the door mirrors, which are part of the mesh.
+        length: 4.65
+        width: 2.05
+        height: 1.26
+
+    # MEASURED from the model: the midpoint-to-midpoint distance between the
+    # front and rear wheel hub nodes is 2.630 m. See the `model:` block.
+    wheelbase: 2.630
+
+    track:
+        # MEASURED from the model's wheel hub nodes: 1.732 m front, 1.739 m
+        # rear (a real, if small, asymmetry in the source mesh).
+        front: 1.732
+        rear: 1.739
+
+    cg:
+        # NOT a Knowledge Base value, and not measurable from the visual mesh
+        # either - CG height depends on mass distribution, which a shell
+        # model does not carry. GT3 cars run very low, publicly cited in the
+        # region of 280-320 mm; authored at the low end, consistent with a
+        # carbon tub, a low-mounted dry-sump V8 and no road-car ground
+        # clearance requirement.
+        height: 0.28
+        # AMG GT3 is front-engined (unlike most of the GT3 field), which
+        # pulls weight forward of a mid-engined car's typical 45-47 % front;
+        # authored slightly forward of neutral for that reason.
+        front_weight_distribution: 0.47
+
+    steering:
+        # GT3 cars run a much quicker rack than a road car - Milliken pp.709ff
+        # gives overall steering ratios generally, and a race rack sits well
+        # below the "cars 15-20:1" figure the Knowledge Base quotes (VD-KB
+        # Section 12.9) specifically BECAUSE high-speed circuit driving needs
+        # little wheel travel for a given road-wheel angle, unlike parking.
+        # Authored: a smaller lock angle than the road cars (this is a wide,
+        # short-overhang car that is never parallel-parked) and a fast slew
+        # rate for a quick rack with power assistance.
+        max_angle: 22.0
+        steering_rate: 400.0
+
+    inertia:
+        yaw: 0.0        # 0 = documented fallback (README, OQ-6)
+
+    engine:
+        # A DEMAND, not an outcome - see FourWheelModel's own note on this.
+        # GT3 BoP power is commonly in the 500-600 hp range for a ~1300 kg
+        # car; 9.0 m/s^2 (~0.92 g) asks the slick rear tyres for more than
+        # they can give from a standing start even before load transfer, so
+        # this vehicle wheelspins off the line on a full-throttle launch
+        # exactly like sports_car does, for the same reason.
+        max_acceleration: 9.0
+
+    drivetrain:
+        layout: rear   # GT3 regulations mandate rear-wheel drive.
+
+    brakes:
+        # Carbon or large steel/iron brakes on slicks. Authored above
+        # sports_car's 11.0 (~1.12 g) to reflect the higher available
+        # friction (see tire.lateral_friction below) - the traction-limited
+        # ceiling this vehicle can actually reach under braking is set by the
+        # tyre model, not this number; this is only the demand.
+        max_deceleration: 15.0
+        front_proportion: 0.0   # derive from Eq. 3-29/3-30
+
+    suspension:
+        # A modest step stiffer than sports_car's 1.45/1.30 Hz - a race
+        # chassis, but not pushed to Milliken's own stated ceiling ("older
+        # Indy type cars without ground effects, 95-120 cpm = 1.58-2.00 Hz").
+        # See the tuning note below on why going further is neither necessary
+        # nor supportable.
+        ride_frequency_front: 1.50
+        ride_frequency_rear: 1.35
+        roll_centre_height_front: 0.0787   # Milliken worked-example values
+        roll_centre_height_rear: 0.1730
+        # TUNING NOTE - why this car does not sit on Milliken Table 16.1's
+        # "Hard - racing cars only" row (1.5 deg/g) the way the roll-gradient
+        # figure might suggest it should.
+        #
+        # This car's CG sits only h_2 = 0.145 m above the roll axis - the
+        # LOWEST of any vehicle in this project, by a wide margin (basic_car:
+        # 0.46 m). Gillespie's roll gradient (Eq. 6-32) has W_s*h_2 as the
+        # DESTABILISING term in its denominator, so a small h_2 means this
+        # chassis needs comparatively little roll stiffness to control roll
+        # at all: at these ride frequencies, the SPRINGS ALONE (zero
+        # anti-roll bar) already give 1.39 deg/g - stiffer than Milliken's
+        # racing-car figure with no bar fitted yet. Adding bar rate to chase
+        # 1.5 deg/g exactly would mean REMOVING roll stiffness, which an
+        # anti-roll bar cannot do.
+        #
+        # So the bar here is sized for what it is actually for - KB Section
+        # 9.4.9's balance lever, front bar rate against the front/rear LOAD
+        # TRANSFER split - not for an independent gradient target. Front-only,
+        # solved so the front total lateral load transfer distribution lands
+        # on Milliken p.604's "weight distribution + 5 %" starting point
+        # (52 % here, against 47 % front weight distribution). The roll
+        # gradient that results, 0.72 deg/g, is reported rather than forced -
+        # stiffer than Milliken's own racing-car row, which is exactly what
+        # this car's unusually low CG predicts through the same equation
+        # Milliken's table is itself summarising.
+        anti_roll_rate_front: 62500.0
+        anti_roll_rate_rear: 0.0
+        unsprung_fraction_driven: 0.15
+        unsprung_fraction_non_driven: 0.10
+        camber_change_per_roll: 0.0   # not modelled - see README, OQ-5
+
+        # Damper damping ratio zeta = C/C_crit [-] - see basic_car.yaml for
+        # what this is for. Milliken p.810: race cars run "considerably
+        # higher" than the ~0.25 passenger figure; authored above the
+        # ~0.5 "road-holding optimum" for a stiff race-tuned damper.
+        damping_ratio_front: 0.45
+        damping_ratio_rear: 0.45
+
+    limits:
+        max_speed: 85.0   # [m/s] = 306 km/h, in line with GT3 top speeds
+
+    wheels:
+        # MEASURED from the model's front-left wheel assembly: the tyre mesh,
+        # baked through the wheel's own node scale, spans 0.693 m vertically
+        # about the hub, i.e. R_u = 0.346 m - matching the real-world GT3
+        # slick reference size (300/680 R18 -> 680 mm diameter = 0.34 m)
+        # closely enough that the two confirm each other. Rounded to 0.34,
+        # which also happens to be this project's own default.
+        radius: 0.34
+        width: 0.32       # GT3 slicks are very wide; visual only
+        inertia: 1.3      # NOT a KB value - see README, OQ-6
+
+    tire:
+        # Slicks, not the road/performance-radial tyres the other three
+        # configs use. Gillespie's own dry range tops out at 0.90 (VD-KB
+        # Section 2.4.2); Milliken adds measured values above that for race
+        # tyres specifically - "Grand Prix tire up to 1.8 at light load"
+        # (Tireand suspension.md Section 6) and Eagle GT-S falling from 1.10
+        # to 0.96 as load rises. GT3 slicks are grippier than a performance
+        # radial but well short of a Formula car's; authored between the two
+        # sources' extremes rather than at either one.
+        lateral_friction: 1.35
+        longitudinal_friction_ratio: 1.0    # pure-circle case - README, OQ-1
+        friction_load_sensitivity: 0.10
+        # Milliken Table 2.2 (VD-KB Section 12.2) gives measured race-tyre
+        # cornering stiffnesses; converting the "Eagle ZR" figure (533 lb/deg
+        # at 1955 lb) to a coefficient gives ~0.27/deg, and "Indy Road" gives
+        # ~0.46/deg. Authored at the low end of that measured race-tyre band,
+        # above sports_car's 0.25 performance-radial figure.
+        cornering_coefficient: 0.28
+        camber_stiffness_ratio: 0.10        # radial, Milliken p.727
+        load_sensitivity_b: 0.0             # no source gives it - README, OQ-2
+        peak_slip_ratio: 0.15
+        # Milliken's own fit, the only universal-curve coefficients either
+        # source gives (P195/70R-14) - reused here as it is for every other
+        # vehicle. See README, Open Questions on this model in general.
+        universal_curve: { b: 0.714, c: 1.40, d: 1.00, e: -0.20 }
+        aligning_moment_coefficient: 0.043
+        # Milliken's OWN worked examples all use K_T = 2000 lb/in for a race
+        # car (VD-KB Section 12.2/12.3), against Gillespie's 1000 lb/in
+        # example for a road tyre - used here instead of the road-tyre
+        # default because this is exactly the race-car context Milliken's
+        # figure is drawn from. 2000 lb/in = 350253.7 N/m.
+        vertical_rate: 350253.7
+        relaxation_length_revolutions: 0.75
+        # Static negative camber is standard race-car alignment practice to
+        # keep the outside tyre's contact patch flatter under cornering load;
+        # not a Knowledge Base number (alignment SETTINGS are a setup choice,
+        # not physics), authored at a typical circuit-racing figure.
+        static_camber: -3.0
+
+    # Road load - the forces that slow a COASTING vehicle. A GT3 car's wing
+    # and splitter raise drag well above a road car's for the aerodynamic
+    # DOWNFORCE they buy - which this project does not model at all (no
+    # source in the Knowledge Base gives a lift/downforce coefficient split
+    # front-to-rear that could feed the load-transfer chain; see README,
+    # OQ-17). Only the drag penalty is represented here; the downforce is not.
+    road_load:
+        rolling_resistance: 0.012   # slicks; below the road-tyre figures
+        drag_coefficient: 0.85      # winged race car, not a road shape
+        frontal_area: 1.90          # low and wide
+        engine_braking: 0.02        # larger race engine, more overrun drag
+
+    # -----------------------------------------------------------------------
+    #  IMPORTED MODEL
+    #
+    #  See src/rendering/GltfModel.h for exactly what this does and does not
+    #  do (base-colour texturing only, no normal/metallic maps, opaque glass).
+    #  The wheel node names below were read directly out of the .glb's own
+    #  node names; the axis choice was determined by which glTF axis the
+    #  front/rear wheel hub translations actually differ along (+Z), with +Y
+    #  already vertical - not guessed, checked against the file.
+    # -----------------------------------------------------------------------
+    model:
+        path: "assets/models/gt3_redbull.glb"
+        forward_axis: "+z"
+        up_axis: "+y"
+        wheel_nodes:
+            front_left:  "WheelAssembly-FL"
+            front_right: "WheelAssembly-FR"
+            rear_left:   "WheelAssembly-RL"
+            rear_right:  "WheelRearAssembly-RR"
+
+    # -----------------------------------------------------------------------
+    #  CAMERA MOUNTS - vehicle-local [x forward from the rear axle, y up, z
+    #  right]. The model's interior is one merged mesh with no seat node to
+    #  measure, so these were placed by eye in the running simulator: the
+    #  AMG GT's cabin sits well back, close to the rear axle, behind a long
+    #  bonnet over the front-mid V8. Left-hand drive.
+    # -----------------------------------------------------------------------
+    cameras:
+        driver_eye: [0.95, 1.00, -0.38]
+        bonnet:     [2.05, 1.12, 0.0]
+
+    # Only the tyres and wind are heard until this car gets an `engine:
+    # detailed:` block - the engine sound is made from the detailed engine's
+    # own cycle, and the simple acceleration demand has none. The firing
+    # data is here ready for that.
+    sound:
+        # AMG M159 6.2 L V8: CROSS-plane crank, firing order
+        # 1-5-4-8-6-3-7-2 with cylinders 1-4 on the right bank, 5-8 on the
+        # left - so the banks do NOT alternate (R L R L L R L R), which is
+        # the uneven per-bank pulse train that gives the classic V8 burble.
+        firing_angles_deg: [0, 90, 180, 270, 360, 450, 540, 630]
+        firing_banks:      [0, 1, 0, 1, 1, 0, 1, 0]
+        exhaust_pipe_length: 2.2
+        muffler_cutoff_hz: 1500.0
+        engine_position: [2.10, 0.45, 0.0]

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EngineSim</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9h3l1-3h8l1 3h3v8h-3l-1 2H8l-1-2H4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 13h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span>EngineSim</span>
+  </div>
+  <div class="engine-pick">
+    <select id="engine-select" aria-label="Engine" data-tip="Engine::Choose which engine to simulate. Switching resets the simulation. Key: V"></select>
+    <span id="engine-meta" class="dim"></span>
+    <button id="btn-reload" class="cfg-btn" aria-label="Reload engine file"
+            data-tip="Engine file::Everything about this engine (geometry, valves, exhaust, intake, vehicle and sound character) lives in one TOML file. Edit it in any text editor and save: the dashboard applies the change within a second, while the engine keeps running. If the file has a mistake you get a red message and the previous settings stay active. Click to reload now.">
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M20 12a8 8 0 11-2.6-5.9M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span id="cfg-file">engine file</span>
+    </button>
+  </div>
+  <div id="state-pill" class="pill" data-tip="Engine state::What the engine is doing right now: off, cranking, running, stalled, on the rev limiter, fuel-cut engine braking, or held by the dyno.">ENGINE OFF</div>
+  <div class="spacer"></div>
+  <div class="chips">
+    <span class="chip" data-tip="Frame rate::How many times per second this page redraws. Should sit near your monitor's refresh rate (60)."><b id="c-fps">60</b> FPS</span>
+    <span class="chip" data-tip="Real-time ratio::Simulated time divided by wall-clock time. 1.00× = the physics keeps up. Below 1 means slow-motion is on or the computer cannot keep up."><b id="c-rt">1.00×</b> real-time</span>
+    <span class="chip" data-tip="Physics rate::Engine simulation steps per second (1000 = one step per millisecond)."><b id="c-hz">1000</b> Hz physics</span>
+    <span class="chip" data-tip="Audio delay::Time between the simulation producing a state and it coming out of your speakers. Includes the audio buffer."><b id="c-lat">--</b> ms audio</span>
+  </div>
+  <div class="seg" id="speed-seg" data-tip="Slow motion::Run the simulation slower to watch valves, pistons and firing order. Keys: , and ."></div>
+  <button id="btn-mute" class="icon-btn" data-tip="Sound on / off::Mute or unmute all engine audio. Key: M" aria-label="Mute">
+    <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/><path id="mute-waves" d="M16 8.5a5 5 0 010 7M18.5 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+  </button>
+  <button id="btn-help" class="icon-btn" data-tip="Help::Show every keyboard shortcut. Key: H" aria-label="Help">?</button>
+</header>
+
+<div id="cfg-error" role="alert" hidden></div>
+
+<main id="dash">
+
+  <!-- INSTRUMENTS -->
+  <section class="card" id="cluster">
+    <header class="card-h"><h2>Instruments</h2></header>
+    <div class="cluster-body">
+      <div class="dial" data-tip="Engine speed::Crankshaft revolutions per minute (rpm). The orange zone is the rev limiter: above redline the ECU cuts fuel."><div class="dial-cap">ENGINE SPEED</div><canvas data-g="rpm"></canvas></div>
+      <div class="dial" data-tip="Vehicle speed::Road speed in mph. While the clutch is locked it equals engine rpm ÷ gear ratio."><div class="dial-cap">VEHICLE SPEED</div><canvas data-g="mph"></canvas></div>
+      <div class="pedals">
+        <div class="pedal" data-tip="Throttle::How far the throttle plate is open. Comes from your keys or the throttle slider."><span class="mini-cap">THROTTLE</span><div class="bar"><i id="p-thr"></i></div><b id="p-thr-v">0</b></div>
+        <div class="pedal" data-tip="Clutch pedal::How far the clutch is pressed in (100 = fully disengaged). With auto clutch on, it presses in by itself at low rpm and during shifts."><span class="mini-cap">CLUTCH</span><div class="bar"><i id="p-clu" class="c-green"></i></div><b id="p-clu-v">0</b></div>
+        <div class="pedal" data-tip="Brake::How hard the brakes are applied. Hold B or the Brake button."><span class="mini-cap">BRAKE</span><div class="bar"><i id="p-brk" class="c-red"></i></div><b id="p-brk-v">0</b></div>
+      </div>
+      <div class="strip">
+        <div class="gear-box" data-tip="Gear::N = neutral (engine disconnected from the wheels). Shift with ↑ / ↓ or the number keys. Lower gears = more rpm per mph and stronger engine braking.">
+          <div class="mini-cap">GEAR</div><div id="gear">N</div>
+        </div>
+        <div class="lamps">
+          <span class="lamp" id="lamp-ign" data-tip="Ignition::Lit when the ignition is on (A). Off = no spark and no fuel, so the engine just spins down.">IGN</span>
+          <span class="lamp" id="lamp-start" data-tip="Starter::Lit while the starter motor is turning the engine. Hold S.">START</span>
+          <span class="lamp" id="lamp-cut" data-tip="Fuel cut::Lit when no fuel is injected: at the rev limiter, or when you lift off the throttle above about 1.5× idle (decel fuel cut-off, which is what makes engine braking).">FUEL CUT</span>
+          <span class="lamp" id="lamp-clutch" data-tip="Clutch::LOCK = engine and wheels connected. SLIP = clutch is engaging (launch or shift). Blank in neutral.">CLUTCH</span>
+          <span class="lamp" id="lamp-dyno" data-tip="Dynamometer::Lit when the dyno is holding the engine at a set speed and measuring torque and power (D).">DYNO</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENGINE VIEW -->
+  <section class="card" id="engine-card">
+    <header class="card-h"><h2>Engine</h2><span id="engine-sub" class="dim"></span>
+      <span class="spacer"></span>
+      <span class="mini-cap" data-tip="Cylinder firing lamps::Each lamp flashes when that cylinder's spark fires. Rows are cylinder banks (a V engine has two).">FIRING</span>
+      <canvas id="ign-canvas"></canvas>
+    </header>
+    <div class="engine-view"><canvas id="engine-canvas"></canvas><div id="toast"></div></div>
+  </section>
+
+  <!-- SOUND MIXER -->
+  <section class="card" id="mixer">
+    <header class="card-h"><h2>Sound</h2><span class="dim">your own engine tone</span>
+      <span class="spacer"></span>
+      <button class="btn small" id="mix-reset" data-tip="Reset sound::Put every dial back to its default position.">Reset</button>
+    </header>
+    <div class="mixer-body">
+      <div class="presets" id="presets"></div>
+      <div class="lvl" data-tip="LVL: output level::Live level of the sound leaving the synth. The bar is the loudest peak, the tick is the recent peak-hold. Red means it is clipping: turn VOL or DRIVE down.">
+        <span class="mini-cap">LVL</span><canvas id="lvl-canvas"></canvas>
+      </div>
+      <div class="group"><h3>MIX</h3><div class="knobs" id="knobs-MIX"></div></div>
+      <div class="group"><h3>TONE</h3><div class="knobs" id="knobs-TONE"></div></div>
+      <div class="group"><h3>CHARACTER</h3><div class="knobs" id="knobs-CHARACTER"></div></div>
+      <div class="spec" data-tip="Spectrum::Live frequency content of the sound you hear. Bass is on the left, treble on the right; the taller the curve, the more energy at that pitch. Watch it move as you turn +LF, +HF, RING or RASP.">
+        <div class="cap">SPECTRUM</div><canvas id="spec-canvas"></canvas>
+      </div>
+      <p class="mixer-hint">Hover any dial to see what it does. Drag up/down (Shift = fine), scroll, or double-click to reset. Your settings are remembered.</p>
+    </div>
+  </section>
+
+  <!-- DRIVER CONTROLS -->
+  <section class="card" id="controls">
+    <header class="card-h"><h2>Driver</h2></header>
+    <div class="controls-body">
+      <div class="ctl-row">
+        <button class="btn toggle" id="b-ign" data-tip="Ignition::Switch the ignition on or off. Off = no spark and no fuel. Key: A">Ignition <kbd>A</kbd></button>
+        <button class="btn hold accent" id="b-start" data-tip="Starter::Hold to crank the engine (also switches the ignition on). Release when it catches. Key: S">Start <kbd>S</kbd></button>
+      </div>
+      <div class="ctl-block">
+        <div class="ctl-label"><span>Throttle</span><span id="thr-readout" class="mono"></span></div>
+        <input type="range" id="thr-slider" min="0" max="100" value="0" aria-label="Throttle setting"
+               data-tip="Throttle setting::Holds the throttle at this opening. Keys Q W E R hold 10 / 25 / 50 / 100 %, Space ramps up while held, Z / X nudge it.">
+        <div class="hint"><kbd>Q</kbd><kbd>W</kbd><kbd>E</kbd><kbd>R</kbd> = 10 · 25 · 50 · 100 % &nbsp; <kbd>Space</kbd> ramp</div>
+      </div>
+      <div class="ctl-block">
+        <div class="ctl-label"><span>Gearbox</span><span class="dim">↑ / ↓ or 1–4</span></div>
+        <div class="seg wide" id="gear-seg"></div>
+      </div>
+      <div class="ctl-row">
+        <button class="btn hold" id="b-clutch" data-tip="Clutch pedal::Hold to disconnect the engine from the gearbox (for manual shifting). Key: Shift">Clutch <kbd>Shift</kbd></button>
+        <button class="btn hold danger" id="b-brake" data-tip="Brake::Hold to brake the vehicle. Key: B">Brake <kbd>B</kbd></button>
+        <button class="btn toggle" id="b-auto" data-tip="Auto clutch::On = the clutch engages by itself as revs rise, and never stalls the engine. Off = you use the clutch pedal, and can stall it. Key: C">Auto clutch <kbd>C</kbd></button>
+      </div>
+      <div class="ctl-block">
+        <div class="ctl-label"><button class="btn toggle small" id="b-dyno" data-tip="Dynamometer::Hold the engine at a fixed speed and measure its torque and power (like a dyno test). Key: D">Dyno <kbd>D</kbd></button><span id="dyno-readout" class="mono"></span></div>
+        <div class="ctl-row"><button class="btn small" id="b-dyno-test" data-tip="Dyno test::Open the dyno test setup: choose throttle, rpm range and step, then run an automatic sweep that draws the torque and power curve.">Test setup…</button>
+          <button class="btn small danger" id="b-dyno-abort" hidden data-tip="Stop sweep::Abort the running dyno sweep and turn the dyno off.">Stop sweep</button></div>
+        <input type="range" id="dyno-slider" min="500" max="7000" step="250" value="3000" aria-label="Dyno speed"
+               data-tip="Dyno speed::The engine speed the dynamometer holds. Keys ← / → change it by 250 rpm.">
+      </div>
+    </div>
+  </section>
+
+  <!-- SCOPE -->
+  <section class="card" id="scope">
+    <header class="card-h"><h2>Scope</h2></header>
+    <div class="scope-body">
+      <div class="wave" data-tip="Waveform::The audio you are hearing right now (last ~0.3 s). Each bump is one exhaust pulse. Even spacing = smooth engine, uneven = burble."><div class="cap">WAVEFORM</div><canvas id="wave"></canvas></div>
+      <div class="plots">
+        <div class="plot" data-tip="RPM history::Engine speed over the last ~10 seconds."><div class="cap">RPM</div><canvas data-plot="rpm"></canvas></div>
+        <div class="plot" data-tip="Manifold pressure history::Intake manifold pressure (kPa) over the last ~10 seconds. Low = throttle closed."><div class="cap">MANIFOLD</div><canvas data-plot="map"></canvas></div>
+        <div class="plot" data-tip="Valve lift::Lift of the intake (teal) and exhaust (orange) valves through the 720° four-stroke cycle. The marker is where cylinder 1 is now."><div class="cap">VALVE LIFT</div><canvas data-plot="valves"></canvas></div>
+        <div class="plot" data-tip="Cylinder pressure::Pressure inside a cylinder through the cycle: compression, the firing peak, then the exhaust blow-down. Higher load = higher peak."><div class="cap">CYL. PRESSURE</div><canvas data-plot="pcyl"></canvas></div>
+        <div class="plot" data-tip="P–V diagram::Cylinder pressure against volume on log axes. The enclosed area is the work the cylinder does each cycle."><div class="cap">P–V (LOG)</div><canvas data-plot="pv"></canvas></div>
+        <div class="plot" data-tip="Torque and power history::Torque (white, lb-ft) and power (teal, hp) over the last ~10 seconds."><div class="cap">TORQUE / HP</div><canvas data-plot="tq"></canvas></div>
+        <div class="plot wide zoomable" data-tip="Dyno curve::Click to open a large view with a hover read-out and the measured table. Torque (white, lb-ft) and power (teal, hp) against engine speed. Press D to open the dyno test and run a sweep; the curve fills in as each speed is measured. Power = torque × rpm ÷ 5252, so the two lines always cross at 5252 rpm."><div class="cap">TQ / HP vs RPM</div><canvas data-plot="dyno"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENGINE VITALS -->
+  <section class="card" id="vitals">
+    <header class="card-h"><h2>Engine vitals</h2></header>
+    <div class="vitals-body">
+      <div class="dial sm" data-tip="Manifold pressure::Pressure in the intake manifold relative to outside air, in inches of mercury. About −22 at idle (strong vacuum, throttle closed), near 0 at full throttle. Deep vacuum on lift-off is engine braking."><div class="dial-cap">MANIFOLD</div><canvas data-g="mapg"></canvas></div>
+      <div class="dial sm" data-tip="Air flow::How much air the engine is drawing, in standard cubic feet per minute. More air = more fuel = more power."><div class="dial-cap">AIR FLOW</div><canvas data-g="scfm"></canvas></div>
+      <div class="dial sm" data-tip="Volumetric efficiency::How completely the cylinders fill with fresh air compared with their swept volume. Highest at mid revs, falling at high revs when the intake cannot keep up."><div class="dial-cap">VOL. EFF.</div><canvas data-g="ve"></canvas></div>
+      <div class="dial sm" data-tip="Air / fuel ratio::Mass of air per mass of fuel. 14.7 is chemically perfect for petrol; lower is rich, higher is lean. Shows CUT when no fuel is injected."><div class="dial-cap">AIR / FUEL</div><canvas data-g="afr"></canvas></div>
+      <div class="dial sm" data-tip="Exhaust oxygen::Leftover oxygen in the exhaust, in %. Near 0 when running at the ideal mixture; high when lean or when fuel is cut."><div class="dial-cap">EXHAUST O₂</div><canvas data-g="o2"></canvas></div>
+      <div class="dial sm" data-tip="Spark advance::How many degrees before top dead centre the spark fires. The computer fires earlier at higher rpm so the burn finishes at the right time."><div class="dial-cap">SPARK</div><canvas data-g="spark"></canvas></div>
+      <div class="dial sm" data-tip="Torque::Twisting force at the flywheel in lb-ft. Negative = engine braking."><div class="dial-cap">TORQUE</div><canvas data-g="torque"></canvas></div>
+      <div class="dial sm" data-tip="Power::Horsepower = torque × rpm ÷ 5252. Negative while engine braking."><div class="dial-cap">POWER</div><canvas data-g="hp"></canvas></div>
+      <div class="fuel" data-tip="Fuel::Fuel burned since the simulation started, with cost, the average miles per gallon and distance driven. Use Backspace to reset.">
+        <div class="dial-cap">FUEL USED</div>
+        <b id="f-l">0.000 L</b>
+        <span id="f-gal">0.000 gal</span>
+        <span id="f-usd">$0.00</span>
+        <span id="f-mpg">0.0 mpg</span>
+        <span id="f-mi">0.00 mi</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="audio-gate">
+  <div class="box">
+    <div class="gate-title">EngineSim</div>
+    <p>Click anywhere or press any key to turn on sound.</p>
+    <p class="dim">Then hold <kbd>S</kbd> to crank the engine, and use <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> or <kbd>Space</kbd> for throttle. Press <kbd>H</kbd> for all controls.</p>
+  </div>
+</div>
+
+<div id="dyno-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dm-title">
+  <div class="box">
+    <div class="help-h"><h2 id="dm-title">Dyno test</h2><span class="dim">The dyno holds each speed while the engine runs at the throttle you choose.</span></div>
+    <form id="dm-form" autocomplete="off">
+      <div class="dm-grid">
+        <label><span>Throttle <span class="dim">%</span></span><input type="number" id="dm-thr" min="1" max="100" step="1" value="100"></label>
+        <label><span>Start <span class="dim">rpm</span></span><input type="number" id="dm-start" min="500" step="50" value="1000"></label>
+        <label><span>End <span class="dim">rpm</span></span><input type="number" id="dm-end" min="500" step="50" value="6000"></label>
+        <label><span>Step <span class="dim">rpm</span></span><input type="number" id="dm-step" min="50" step="50" value="500"></label>
+        <label><span>Settle <span class="dim">s</span></span><input type="number" id="dm-settle" min="0.2" max="10" step="0.1" value="1.0"></label>
+        <label><span>Measure <span class="dim">s</span></span><input type="number" id="dm-meas" min="0.1" max="10" step="0.1" value="0.5"></label>
+      </div>
+      <p id="dm-info" class="dim dm-info"></p>
+      <p id="dm-err" class="dm-err" role="alert" hidden></p>
+      <div class="dm-btns">
+        <button type="button" class="btn" id="dm-cancel">Cancel <kbd>Esc</kbd></button>
+        <button type="button" class="btn" id="dm-hold" data-tip="Manual hold::Close this window and leave the dyno holding the start speed at this throttle. Change the speed with the slider or ← / →.">Hold only</button>
+        <button type="submit" class="btn accent" id="dm-run">Run sweep <kbd>Enter</kbd></button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="dyno-plot-modal" hidden role="dialog" aria-modal="true" aria-labelledby="dp-title">
+  <div class="box">
+    <div class="help-h"><h2 id="dp-title">Torque &amp; power vs engine speed</h2><span class="dim">Hover the chart for exact values · Esc or click outside to close</span>
+      <span class="spacer"></span><button class="btn small" id="dp-close">Close <kbd>Esc</kbd></button></div>
+    <div class="dp-body">
+      <div class="dp-chart"><canvas id="dyno-big"></canvas></div>
+      <div class="dp-side"><table id="dp-table"></table></div>
+    </div>
+  </div>
+</div>
+
+<div id="help" hidden>
+  <div class="box">
+    <div class="help-h"><h2>Controls</h2><span class="dim">Hover anything on the dashboard for an explanation. Click to close.</span></div>
+    <div class="help-cols">
+      <table>
+        <tr><th colspan="2">Driving</th></tr>
+        <tr><td><kbd>A</kbd></td><td>Ignition on / off</td></tr>
+        <tr><td><kbd>S</kbd> hold</td><td>Starter (cranks, also switches ignition on)</td></tr>
+        <tr><td><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> hold</td><td>Throttle 10 / 25 / 50 / 100 %</td></tr>
+        <tr><td><kbd>Space</kbd> hold</td><td>Pedal: throttle ramps up while held</td></tr>
+        <tr><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>Throttle setting − / + 2 %</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Shift up / down</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>4</kbd> · <kbd>N</kbd></td><td>Select gear · neutral</td></tr>
+        <tr><td><kbd>Shift</kbd> hold</td><td>Clutch pedal</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Auto clutch on / off (off = you can stall)</td></tr>
+        <tr><td><kbd>B</kbd> hold</td><td>Brake</td></tr>
+        <tr><td><kbd>D</kbd> · <kbd>←</kbd> <kbd>→</kbd></td><td>Dyno on / off (opens the test setup) · dyno speed ∓ 250 rpm</td></tr>
+      </table>
+      <table>
+        <tr><th colspan="2">Sound &amp; simulation</th></tr>
+        <tr><td><kbd>M</kbd></td><td>Mute</td></tr>
+        <tr><td><kbd>−</kbd> / <kbd>+</kbd></td><td>Master volume</td></tr>
+        <tr><td><kbd>P</kbd></td><td>Overrun pops on / off</td></tr>
+        <tr><td>Sound dials</td><td>Drag up/down (<kbd>Shift</kbd> = fine) · scroll · double-click resets · <kbd>Tab</kbd> then arrows</td></tr>
+        <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Slow motion − / +</td></tr>
+        <tr><td><kbd>V</kbd></td><td>Switch engine</td></tr>
+        <tr><td><kbd>Backspace</kbd></td><td>Reset simulation</td></tr>
+        <tr><td><kbd>H</kbd> · <kbd>Esc</kbd></td><td>Show / hide this help</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="ui.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

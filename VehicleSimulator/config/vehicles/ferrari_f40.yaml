@@ -1,0 +1,409 @@
+# ===========================================================================
+#  Ferrari F40 - mid-engined, rear-wheel-drive road car, imported model.
+#
+#  The model is this project's own: it is built procedurally in Blender by
+#  ../F40_Render (build_f40.py, dimensions in f40/dims.py from Ferrari's
+#  published figures and fitted to the reference photos in ../CarREf), then
+#  exported for this simulator by ../F40_Render/export_sim.py. That export
+#  step is what makes the render model loadable here - see its docstring for
+#  exactly what it changes (wheel grouping, floor removed, masked paint
+#  flattened into per-face materials).
+#
+#  As with gt3_redbull.yaml, GEOMETRY (wheelbase, tracks, wheel radius,
+#  overall size) is MEASURED from the model's wheel hub nodes and bounds.
+#  Everything a shell model cannot carry - mass, CG, grip, spring rates - is
+#  authored data, sourced or flagged the same way as every other vehicle.
+#
+#  POWERTRAIN: the detailed engine + gearbox, exactly as sports_car.yaml,
+#  plus the optional `turbo:` block for the F40's twin turbochargers (see
+#  config/EngineParameters.h for what is Heywood there and what is authored).
+# ===========================================================================
+
+vehicle:
+    name: "Ferrari F40"
+
+    # NOT a Knowledge Base value. Ferrari's published DRY weight is 1100 kg;
+    # authored here with fluids, fuel and a driver added, the same basis as
+    # every other vehicle in this project.
+    mass: 1300.0
+
+    dimensions:
+        # Measured from the model's bounding box, wheels excluded: 4.489 x
+        # 2.060 x 1.124 m. Width includes the door mirrors (1.970 m body,
+        # matching the published figure). Length is ~0.13 m over the
+        # published 4.358 m - a known property of the model, whose overhangs
+        # were fitted to the side reference photo (see f40/dims.py, OH_REAR).
+        length: 4.49
+        width: 2.06
+        height: 1.12
+
+    # MEASURED from the model's front and rear hub nodes: 2.450 m, which is
+    # also Ferrari's published figure (the model was built to it).
+    wheelbase: 2.450
+
+    track:
+        # MEASURED from the hub nodes; again equal to the published figures.
+        front: 1.594
+        rear: 1.606
+
+    cg:
+        # NOT a Knowledge Base value and not measurable from a shell mesh.
+        # Authored between gt3_redbull (0.28, a race car on slicks with no
+        # ground-clearance requirement) and sports_car (0.42): a mid-engined
+        # road car with a low-mounted V8 behind the cabin and ~125 mm ground
+        # clearance.
+        height: 0.38
+        # Mid-engined: the commonly cited static split is 42 / 58.
+        front_weight_distribution: 0.42
+
+    steering:
+        # Unassisted road-car rack. Same lock and a little slower than
+        # sports_car's, since the F40 has no power steering.
+        max_angle: 30.0
+        steering_rate: 220.0
+
+    inertia:
+        yaw: 0.0        # 0 = documented fallback (README, OQ-6)
+
+    engine:
+        # IGNORED while `detailed` below is present - kept, as in
+        # sports_car.yaml, so the simple model is one edit away. 478 PS in a
+        # 1300 kg car; published 0-100 km/h times of ~4 s average ~7 m/s^2.
+        max_acceleration: 8.5
+
+        # -------------------------------------------------------------------
+        #  DETAILED ENGINE - Ferrari F120A, 2.9 L twin-turbo 90-degree V8.
+        #
+        #  Sourced from Heywood via ../EngineSim, NOT this project's own
+        #  Knowledge Base (KB gap G17) - see config/EngineParameters.h.
+        #
+        #  The `resolved:` block below makes this EngineSim's crank-angle-
+        #  resolved engine (physics/ResolvedEngine.h): eight cylinders
+        #  breathing through real valves into real plenums, two turbines in
+        #  the exhaust driving two compressors. Boost, turbo lag, exhaust
+        #  back-pressure and volumetric efficiency are RESULTS here, not
+        #  settings. Delete `resolved:` and the car falls back to the
+        #  cycle-averaged engine (physics/Engine.cpp) with the authored
+        #  `turbo:` block, which is otherwise inert.
+        #
+        #  Geometry is Ferrari's published data: 82.0 x 69.5 mm, 2936 cc,
+        #  7.8:1 compression (low, as Heywood Sec 15.6 says turbocharged SI
+        #  engines run, to stay off the knock limit under boost), 1.1 bar
+        #  boost, twin IHI turbochargers, twin air-to-air intercoolers.
+        #
+        #  WHAT THE MODEL MAKES  (build/bin/engine_dyno ferrari_f40, or the
+        #  Powertrain panel's dyno sweep):
+        #
+        #       rpm    2200  2800  3400  4000  5300  6500  7100  7700
+        #       N.m     274   482   478   468   438   397   376   354
+        #       kW       63   142   171   198   242   271   281   286
+        #
+        #  against Ferrari's 577 N.m at 4000 and 352 kW (478 PS) at 7000.
+        #  The SHAPE is the car's: next to nothing below 2500 rpm, then the
+        #  turbos arrive together and the curve stays flat. The LEVEL is
+        #  ~19 % short on torque and ~20 % on power. That gap is the model,
+        #  not a typo: the mixture is held stoichiometric (the real engine
+        #  runs rich under boost), there is no intake or exhaust wave tuning,
+        #  and the intercooler figure is a guess. It is left visible rather
+        #  than closed by pushing boost or combustion efficiency past their
+        #  real values. The cycle-averaged model made 480 N.m and 247 kW, but
+        #  reached them with an authored boost curve and an authored lag.
+        # -------------------------------------------------------------------
+        detailed:
+            bore: 0.082               # [m]  published
+            stroke: 0.0695            # [m]  published - short stroke, revs freely
+            rod_length: 0.130         # [m]  AUTHORED, not published
+            compression_ratio: 7.8    # [-]  published
+            num_cylinders: 8
+            inertia: 0.25             # [kg.m^2] AUTHORED - V8 crank + flywheel, see EngineParameters.h
+            idle_rpm: 950
+            redline_rpm: 7750         # published rev limit
+            limiter_hysteresis_rpm: 150
+            # Resolved core: only the ECU's first guess at its air model.
+            max_volumetric_efficiency: 0.95
+            # CYCLE-AVERAGED MODEL ONLY (ignored by `resolved:`) - where that
+            # model's authored eta_v curve falls away. See EngineParameters.h.
+            ve_reference_rpm: 8000
+            stoich_afr: 14.7          # [-] gasoline, Heywood Table D.4
+            lower_heating_value: 44.0e6   # [J/kg] Heywood Table D.4
+            combustion_efficiency: 0.95
+            friction:
+                # Heywood Eq 13.6, tfmep(bar) = 0.97 + 0.15(N/1000) + 0.05(N/1000)^2
+                # with N in rev/min, is 900 and 18 per rev/s (EngineParameters.h).
+                # That fit is to production fours of ~85 mm stroke, and its
+                # speed terms are really piston-speed terms. AUTHORED: scaled
+                # here by this engine's stroke, 69.5/86 (linear term) and its
+                # square (quadratic term) - without it the correlation charges
+                # a 69.5 mm stroke at 7000 rpm for the piston speed of an
+                # 86 mm one, about 1 bar of mep (18 kW) too much.
+                c1_pa: 97000.0
+                c2_pa_per_rev_s: 727.0
+                c3_pa_per_rev_s2: 11.8
+
+            # CYCLE-AVERAGED MODEL ONLY (ignored by `resolved:`): boost level,
+            # spool curve and lag, all authored. Kept as the fallback.
+            turbo:
+                max_boost_pa: 110000.0        # [Pa] gauge - 1.1 bar, published
+                boost_threshold_rpm: 2500     # AUTHORED - F40's famous lag:
+                full_boost_rpm: 4000          # AUTHORED   little below ~3000, full at peak torque
+                spool_time_constant_s: 0.6    # AUTHORED
+                blow_off_time_constant_s: 0.08    # AUTHORED
+                compressor_efficiency: 0.70   # Heywood Prob 6.9
+                intercooler_effectiveness: 0.70   # AUTHORED - air-to-air
+
+            # ---------------------------------------------------------------
+            #  RESOLVED CORE. Keys are EngineSim's own (engine_sim/config.py);
+            #  every one not listed keeps EngineSim's default - see
+            #  config/ResolvedEngineParameters.h for the full set.
+            # ---------------------------------------------------------------
+            resolved:
+                num_valves_per_cyl: 4         # DOHC, 2 intake + 2 exhaust - published
+                # Flat-plane crank: banks alternate on every firing.
+                firing_order: [1, 5, 3, 7, 4, 8, 2, 6]
+
+                # Valve events [crank deg] and sizes (per valve). AUTHORED:
+                # Ferrari does not publish them. Sized for a 4-valve head on
+                # an 82 mm bore, with a cam a little longer than a road car's.
+                intake_open_btdc_deg: 14
+                intake_close_abdc_deg: 56
+                exhaust_open_bbdc_deg: 54
+                exhaust_close_atdc_deg: 12
+                intake_head_dia_m: 0.0310
+                intake_port_dia_m: 0.0280
+                intake_max_lift_m: 0.0095
+                exhaust_head_dia_m: 0.0275
+                exhaust_port_dia_m: 0.0250
+                exhaust_max_lift_m: 0.0090
+
+                # Air path and exhaust. AUTHORED.
+                manifold_volume_m3: 0.005
+                throttle_max_area_m2: 0.0040      # eight throttle bodies' worth
+                exhaust_plenum_volume_m3: 0.012   # manifolds, up to the turbines
+                exhaust_tail_dia_m: 0.085         # equivalent single bore of the tail pipes
+
+                # Idle and starting. AUTHORED (EngineSim KB_GAPS G-E03..G-E06).
+                stall_rpm: 450
+                iac_feedforward: 0.008
+                iac_max: 0.016
+                starter_stall_torque_nm: 300      # must beat a real compression stroke
+
+                # Two turbochargers, modelled as one with the flow, area and
+                # inertia of the pair - exact for symmetric banks.
+                turbo:
+                    count: 2
+                    target_boost_pa: 211000       # [Pa] ABSOLUTE: 1.1 bar gauge, published
+                    wastegate_gain: 1.0
+                    # AUTHORED - no map is published for the IHI units. The
+                    # turbine area is what sets the boost threshold: 1.2e-3
+                    # brings the turbos in between 2200 and 2800 rpm at full
+                    # throttle (6.5e-4 would spool them by 1600, and cost
+                    # 40 kW at the top in back-pressure).
+                    turbine_area_m2: 1.2e-3
+                    wastegate_area_m2: 1.6e-3
+                    # Rotor inertia per turbo is what turbo LAG is: with 5e-5
+                    # (a small automotive rotor; EngineSim's default 1.2e-4 is
+                    # a much larger unit) a throttle snapped open at 3500 rpm
+                    # reaches full boost in ~1.5 s, at 5000 rpm in ~0.8 s
+                    # (build/bin/engine_dyno ferrari_f40 --transient 3500).
+                    inertia_kgm2: 5.0e-5
+                    design_flow_kgs: 0.20         # per turbo: ~0.4 kg/s of air at 350 kW
+                    design_pressure_ratio: 2.4
+                    intercooler_effectiveness: 0.70   # AUTHORED - air-to-air
+
+    drivetrain:
+        layout: rear
+
+    # -----------------------------------------------------------------------
+    #  GEARBOX - 5-speed manual, rear transaxle.
+    #
+    #  AUTHORED, as every gearbox in this project is (GearboxParameters.h).
+    #  Not the factory ratio set: designed to the published performance. Top
+    #  gear x final drive = 2.70 puts 90 m/s (324 km/h, the published top
+    #  speed) at ~6950 rpm, on the model's power peak; the other four follow
+    #  a geometric progression (step 1.37) down to a 1st that runs to
+    #  ~100 km/h at the limiter.
+    # -----------------------------------------------------------------------
+    gearbox:
+        shift_mode: automatic     # automatic | manual   (Z = down, X = up)
+        clutch_mode: automatic    # automatic | manual   (Left Shift = pedal)
+        ratios: [3.30, 2.40, 1.75, 1.28, 0.93]
+        final_drive: 2.90
+        efficiency: 0.90               # AUTHORED - same as sports_car
+        upshift_redline_fraction: 0.92
+        downshift_redline_fraction: 0.40
+        min_shift_interval_s: 0.4
+        # Must sit above the engine's peak torque (~490 N.m in the model)
+        # - see GearboxParameters.h. AUTHORED.
+        clutch_capacity_nm: 650.0
+        clutch_engage_time_s: 0.8
+        # The automatic clutch feeds in against engine speed and is fully
+        # home by this speed at full throttle, instead of biting at idle -
+        # where this engine, off boost, has a third of its torque. See
+        # GearboxParameters.h. AUTHORED.
+        launch_rpm: 4500
+
+    brakes:
+        # Road tyres, not slicks: the same demand as sports_car. The ceiling
+        # actually reached is set by the tyre model, not this number.
+        max_deceleration: 11.0
+        front_proportion: 0.0   # derive from Eq. 3-29/3-30
+
+    suspension:
+        # A step stiffer than sports_car (1.45 / 1.30 Hz) for a car that was
+        # sold as a road-legal racer: the same as gt3_redbull, and still
+        # short of Milliken's race-car band (1.58-2.00 Hz).
+        ride_frequency_front: 1.50
+        ride_frequency_rear: 1.35
+        roll_centre_height_front: 0.0787   # Milliken worked-example values
+        roll_centre_height_rear: 0.1730
+        # Front-only bar, as on sports_car. AUTHORED, not solved: scaled up
+        # from sports_car's 8200 for the stiffer springs. KB Section 9.4.9's
+        # balance target (front load-transfer share ~5 % above the 42 % front
+        # weight share, Milliken p.604) can be checked against the derived
+        # value the UI reports, and this tuned to it.
+        anti_roll_rate_front: 12000.0
+        anti_roll_rate_rear: 0.0
+        unsprung_fraction_driven: 0.15
+        unsprung_fraction_non_driven: 0.10
+        camber_change_per_roll: 0.0   # not modelled - see README, OQ-5
+        damping_ratio_front: 0.35
+        damping_ratio_rear: 0.35
+
+    limits:
+        max_speed: 90.0   # [m/s] = 324 km/h, the F40's published top speed
+
+    wheels:
+        # MEASURED from the model's hub nodes, which sit at the unloaded
+        # radius of each tyre (f40/dims.py): front 245/40 ZR17 -> 0.314 m,
+        # rear 335/35 ZR17 -> 0.333 m. The physics has ONE radius; the
+        # driven REAR tyre's is used, since it is the one the drive force and
+        # wheel-speed dynamics act through. The front model wheels are drawn
+        # at their own, lower hub height (GltfModel::hubHeightOffset), so
+        # the stagger is visible even though the physics does not model it.
+        radius: 0.333
+        width: 0.335      # rear tyre; visual only
+        inertia: 1.2      # NOT a KB value - see README, OQ-6
+
+    tire:
+        # Road-legal performance tyres (Pirelli P Zero on the original car),
+        # so sports_car's performance-radial values apply unchanged - Gillespie's
+        # dry range tops out at 0.90 (VD-KB Section 2.4.2).
+        lateral_friction: 0.90
+        longitudinal_friction_ratio: 1.0    # pure-circle case - README, OQ-1
+        friction_load_sensitivity: 0.10
+        cornering_coefficient: 0.25
+        camber_stiffness_ratio: 0.10        # radial, Milliken p.727
+        load_sensitivity_b: 0.0             # no source gives it - README, OQ-2
+        peak_slip_ratio: 0.15
+        universal_curve: { b: 0.714, c: 1.40, d: 1.00, e: -0.20 }
+        aligning_moment_coefficient: 0.043
+        vertical_rate: 175127.0
+        relaxation_length_revolutions: 0.75
+        static_camber: 0.0
+
+    road_load:
+        rolling_resistance: 0.014
+        drag_coefficient: 0.34      # Ferrari's published figure
+        frontal_area: 1.80          # low (1.124 m) body
+        engine_braking: 0.015
+
+    # -----------------------------------------------------------------------
+    #  IMPORTED MODEL
+    #
+    #  Axes read from the file, not guessed: the front hubs sit at glTF
+    #  z = -1.225 and the rear at +1.225, so forward is -z; the left ('.L')
+    #  parts sit at -x, which is what forward x up = +x as right requires.
+    #  The Wheel_* nodes are the empties export_sim.py adds at each hub.
+    # -----------------------------------------------------------------------
+    model:
+        path: "assets/models/ferrari_f40.glb"
+        forward_axis: "-z"
+        up_axis: "+y"
+        wheel_nodes:
+            front_left:  "Wheel_FL"
+            front_right: "Wheel_FR"
+            rear_left:   "Wheel_RL"
+            rear_right:  "Wheel_RR"
+
+    # -----------------------------------------------------------------------
+    #  CAMERA MOUNTS - vehicle-local [x forward from the rear axle, y up
+    #  from the ground, z right], read off the model's own nodes
+    #  (x = 1.225 - glTF z, y = glTF y, z = glTF x):
+    #    driver's seat and headrest at glTF x = -0.335 (left-hand drive),
+    #    seat back front face z = 0.024 (local 1.20), top y = 1.0; scuttle (DashCowl) z = -1.075,
+    #    y = 0.79; nose tip z = -2.496; body side |x| = 0.985.
+    # -----------------------------------------------------------------------
+    cameras:
+        driver_eye: [1.33, 0.95, -0.335]   # 0.13 m ahead of the seat back (front face x = 1.20)
+        bonnet:     [2.35, 0.90, 0.0]      # above the scuttle
+        bumper:     [3.60, 0.30, 0.0]      # 0.12 m behind the nose tip
+        wheel:      [1.30, 0.45, -1.06]    # left flank, ahead of the door
+
+    # -----------------------------------------------------------------------
+    #  SOUND - see VehicleSoundConfig in config/VehicleParameters.h. The
+    #  pulses, their strength and timing come from the engine model; only
+    #  the hardware below is authored.
+    # -----------------------------------------------------------------------
+    sound:
+        # Flat-plane crank V8: even 90-degree firing, alternating banks every
+        # event - each bank's exhaust sees evenly spaced pulses, which is the
+        # hard, high-pitched flat-plane note (a cross-plane V8 does not
+        # alternate, which is where its burble comes from).
+        firing_angles_deg: [0, 90, 180, 270, 360, 450, 540, 630]
+        firing_banks:      [0, 1, 0, 1, 0, 1, 0, 1]
+        # Each bank: manifold -> its own turbo -> a single rear silencer.
+        # AUTHORED; a short run for a mid-engined car.
+        exhaust_pipe_length: 1.8
+        muffler_cutoff_hz: 1300.0          # lightly silenced - higher than the 900 Hz default
+        # IHI turbos: ~52 mm compressor wheels, 6 main blades. AUTHORED.
+        turbo_tip_radius: 0.026
+        turbo_blades: 6
+        gear_teeth: 23
+        # Engine block (EngineBlock node, glTF z = 1.025) - behind the driver.
+        engine_position: [0.20, 0.58, 0.0]
+        exhaust_position: [-0.75, 0.35, 0.0]
+
+        # -------------------------------------------------------------------
+        #  ENGINESIM'S ENGINE SOUND. With this block the engine, exhaust and
+        #  intake are heard through EngineSim's own synthesiser
+        #  (audio/EngineSimSynth.h); delete it and the car goes back to the
+        #  model the keys above describe. Turbo whine, blow-off, gearbox,
+        #  tyres and wind are this simulator's either way.
+        #
+        #  Keys are EngineSim's (the [exhaust], [intake], [sound] and [layout]
+        #  sections of an engine file). All AUTHORED: what you HEAR is noted.
+        # -------------------------------------------------------------------
+        engine_sim:
+            # One pipe per bank, left and right. The flat-plane firing order
+            # alternates banks, so each pipe gets an EVEN pulse every 180 deg:
+            # two four-cylinder howls, not a cross-plane burble.
+            exhaust_layout: dual
+            cylinder_bank: [0, 0, 0, 0, 1, 1, 1, 1]     # cylinders 1-4 right, 5-8 left
+            # Lengths per pipe [m] - longer = lower pipe resonances. Short:
+            # mid-engined, a turbo close to each manifold. The two differ
+            # slightly so the banks do not cancel into one even train.
+            exhaust_header_length_m: [0.45, 0.48]
+            exhaust_mid_length_m: [0.70, 0.76]
+            exhaust_muffler_length_m: 0.40
+            exhaust_tail_length_m: [0.30, 0.33]
+            exhaust_muffler_area_ratio: 4.0      # chamber / pipe: bigger = quieter, more muffled
+            exhaust_muffler_body_hz: [140, 150]  # boom of the silencer shell
+            # Gas temperature per section [K]: hotter = faster sound = higher
+            # pipe pitch. A turbocharged exhaust runs hot.
+            exhaust_header_temp_k: 850
+            exhaust_mid_temp_k: 720
+            exhaust_muffler_temp_k: 570
+            exhaust_tail_temp_k: 470
+            exhaust_pipe_loss: 0.995             # wall friction per pass: lower = pulses die faster
+            exhaust_tip_damping: 0.22            # open-end treble loss: lower = brighter, raspier
+            intake_runner_length_m: 0.25
+            intake_runner_temp_k: 320
+            # Character. A race-bred engine is even from cylinder to cylinder.
+            sound_cylinder_strength_spread: 0.10
+            sound_cylinder_timing_spread_deg: 2.5
+            sound_noise_seed: 2936288
+            sound_blowdown_k: 1.35               # blowdown time constant = k * bore / gas speed
+            sound_crank_ripple_gain: 0.30
+            sound_combustion_variability: 0.012
+            sound_idle_variability: 0.03
+            sound_pop_probability: 0.05          # overrun pops per exhaust event

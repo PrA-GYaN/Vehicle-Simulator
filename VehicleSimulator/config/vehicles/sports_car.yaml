@@ -1,0 +1,272 @@
+# ===========================================================================
+#  Sports car - short wheelbase, low CG, rearward weight bias.
+#
+#  Compared with basic_car: lighter, lower, a shorter wheelbase (so it turns
+#  more sharply for the same steer angle, since yaw_rate = v/L * tan(delta)),
+#  and much stronger acceleration and braking.
+# ===========================================================================
+
+vehicle:
+    name: "SportsCar"
+
+    mass: 1250.0
+
+    dimensions:
+        length: 4.3
+        width: 1.9
+        height: 1.2
+
+    # Shorter than the saloon: a smaller L gives a higher yaw rate for the
+    # same speed and steer angle, i.e. a tighter turning circle.
+    wheelbase: 2.45
+
+    track:
+        front: 1.62
+        rear: 1.65
+
+    cg:
+        height: 0.42
+        # Rearward bias, as on a mid- or rear-engined layout.
+        front_weight_distribution: 0.44
+
+    steering:
+        max_angle: 32.0
+        # Quicker rack: the wheels reach full lock in less time.
+        steering_rate: 260.0
+
+    # Yaw inertia [kg.m^2]. 0 = documented fallback (README, OQ-5).
+    inertia:
+        yaw: 0.0
+
+    engine:
+        # A DEMAND, not an outcome. 7.5 m/s^2 asks the rear tyres for about
+        # 0.76 g of tractive force, which is close to what they can give even
+        # before load transfer - so flooring it from rest produces wheelspin,
+        # and sustained wheelspin delivers the SLIDING friction rather than the
+        # peak (Gillespie Section 2.4.2). Modulating the throttle is faster.
+        #
+        # This value is IGNORED once `detailed` below is present - see
+        # config/EngineParameters.h. Left in place so this file still shows
+        # what a vehicle WITHOUT the detailed engine looks like, and so the
+        # simple model is one YAML edit away if `detailed` is ever removed.
+        max_acceleration: 7.5   # [m/s^2] ~0.76 g
+
+        # -------------------------------------------------------------------
+        #  DETAILED ENGINE  --  opts this vehicle into physics/Powertrain.h.
+        #
+        #  Sourced from Heywood, "Internal Combustion Engine Fundamentals",
+        #  via ../EngineSim, NOT from this project's own Knowledge Base
+        #  (Gillespie/Blundell&Harty/Milliken do not give an engine torque
+        #  map - KB gap G17). See config/EngineParameters.h for the full
+        #  source notice before changing any value below.
+        #
+        #  A naturally aspirated 2.0 L four: square, high compression, four
+        #  valves per cylinder, variable intake cam timing. The `resolved:`
+        #  block makes it EngineSim's crank-angle-resolved engine
+        #  (physics/ResolvedEngine.h); delete that block and the car falls
+        #  back to the cycle-averaged engine (physics/Engine.cpp).
+        #
+        #  WHAT THE MODEL MAKES  (build/bin/engine_dyno sports_car):
+        #  170 N.m at 2200 rpm (10.7 bar bmep - Heywood's naturally aspirated
+        #  range is 8.5-10.5) and 81 kW at 6000 rpm. The torque is right for
+        #  the displacement; the POWER is about half of what a real engine
+        #  of this specification makes, because the curve falls from 2200 rpm
+        #  where a real one keeps climbing to 7000. Two reasons, both the
+        #  model's and both left visible: there is no intake or exhaust wave
+        #  tuning (which is what holds a real engine's breathing up at
+        #  speed), and Heywood's friction correlation (Eq 13.6, fitted to
+        #  production engines below ~6000 rpm) charges 5.4 bar at 8000.
+        # -------------------------------------------------------------------
+        detailed:
+            bore: 0.086               # [m]
+            stroke: 0.086             # [m] - square, typical of a rev-happy design
+            rod_length: 0.148         # [m]
+            compression_ratio: 11.5   # [-] Heywood Eq 2.1: SI range 8-12
+            num_cylinders: 4
+            inertia: 0.18             # [kg.m^2] I_E incl. flywheel - see EngineParameters.h
+            idle_rpm: 900
+            redline_rpm: 8000
+            limiter_hysteresis_rpm: 150
+            # Resolved core: only the ECU's first guess at its air model.
+            max_volumetric_efficiency: 0.94
+            stoich_afr: 14.7          # [-] gasoline, Heywood Table D.4
+            lower_heating_value: 44.0e6   # [J/kg] Heywood Table D.4
+            combustion_efficiency: 0.95
+            friction:
+                # Heywood Eq 13.6 (SI): tfmep(bar) = 0.97 + 0.15(N/1000) + 0.05(N/1000)^2
+                # with N in rev/MIN. Per rev/s that is 900 and 18 - not the
+                # 15 and 0.005 this file carried while the cycle-averaged
+                # model was the only one (a unit slip EngineSim has since
+                # corrected; see config/EngineParameters.h).
+                c1_pa: 97000.0
+                c2_pa_per_rev_s: 900.0
+                c3_pa_per_rev_s2: 18.0
+                exhaust_back_pressure_pa: 103000.0   # cycle-averaged model only
+
+            # ---------------------------------------------------------------
+            #  RESOLVED CORE. Keys are EngineSim's own (engine_sim/config.py);
+            #  every one not listed keeps EngineSim's default - see
+            #  config/ResolvedEngineParameters.h for the full set. All of it
+            #  AUTHORED for this (invented) engine.
+            # ---------------------------------------------------------------
+            resolved:
+                num_valves_per_cyl: 4
+                firing_order: [1, 3, 4, 2]
+
+                # Valve events [crank deg] and sizes (per valve).
+                intake_open_btdc_deg: 12
+                intake_close_abdc_deg: 58
+                exhaust_open_bbdc_deg: 56
+                exhaust_close_atdc_deg: 12
+                intake_head_dia_m: 0.0350
+                intake_port_dia_m: 0.0320
+                intake_max_lift_m: 0.0115
+                exhaust_head_dia_m: 0.0300
+                exhaust_port_dia_m: 0.0275
+                exhaust_max_lift_m: 0.0105
+                # Intake cam phaser: the ECU brings it in at mid speed and
+                # load and backs it out toward redline.
+                vvt_intake_min_deg: 0
+                vvt_intake_max_deg: 30
+
+                # Air path and exhaust.
+                manifold_volume_m3: 0.0035
+                throttle_max_area_m2: 0.0030      # ~62 mm throttle body
+                exhaust_plenum_volume_m3: 0.014
+                exhaust_tail_dia_m: 0.060
+
+                # Idle and starting (EngineSim KB_GAPS G-E03..G-E06).
+                stall_rpm: 400
+                iac_feedforward: 0.007
+                starter_stall_torque_nm: 220      # must beat a real compression stroke
+
+    drivetrain:
+        layout: rear
+
+    # ---------------------------------------------------------------------
+    #  GEARBOX  --  only meaningful together with engine.detailed above.
+    #
+    #  AUTHORED, not from the vehicle-dynamics Knowledge Base: ratios and
+    #  shift points are per-vehicle design data, and torque-converter/clutch
+    #  behaviour (KB gaps G18/G20) is not modelled at all. See
+    #  config/GearboxParameters.h and physics/Powertrain.h.
+    # ---------------------------------------------------------------------
+    gearbox:
+        # Who shifts, and who works the clutch. Independent on purpose:
+        #   automatic / automatic  - just drive (default)
+        #   manual    / automatic  - paddle-shift feel: Z down, X up
+        #   automatic / manual     - sequential feel: hold Left Shift to
+        #                            declutch, box still picks the gear
+        #   manual    / manual     - the real thing, three pedals
+        # Both are switchable live from the Powertrain panel in the UI.
+        shift_mode: automatic     # automatic | manual   (Z = down, X = up)
+        clutch_mode: automatic    # automatic | manual   (Left Shift = pedal)
+
+        ratios: [3.36, 2.09, 1.47, 1.14, 0.92, 0.78]   # close-ratio 6-speed
+        final_drive: 3.90
+        efficiency: 0.90               # AUTHORED - typical manual-transmission order of magnitude
+        upshift_redline_fraction: 0.92
+        downshift_redline_fraction: 0.35
+        min_shift_interval_s: 0.4
+
+    brakes:
+        # 1.12 g of demand against a 0.90 mu tyre: this car can lock its wheels
+        # on a dry road at full pedal, and will.
+        max_deceleration: 11.0
+        front_proportion: 0.0   # derive from Eq. 3-29/3-30
+
+    suspension:
+        # Milliken p.582: sports cars 70-90 cpm = 1.17-1.50 Hz. Upper part of
+        # that band, and stiffer at the front - Milliken p.589: "on most
+        # rear-drive race cars the front natural frequency is higher than the
+        # rear, based on front roll stiffness requirements."
+        ride_frequency_front: 1.45
+        ride_frequency_rear: 1.30
+        roll_centre_height_front: 0.0787   # Milliken worked-example values
+        roll_centre_height_rear: 0.1730
+        # Sized against Milliken Table 16.1. Achieved: 3.2 deg/g, between the
+        # "very firm: high-performance" row (4.2) and "extremely firm:
+        # contemporary very-high-performance sports, such as Corvette" (3.0),
+        # with a front load transfer distribution of 47 % against a 44 % front
+        # weight distribution - close to the "weight distribution + 5 %"
+        # starting point Milliken p.604 recommends.
+        anti_roll_rate_front: 8200.0
+        anti_roll_rate_rear: 0.0
+        unsprung_fraction_driven: 0.15
+        unsprung_fraction_non_driven: 0.10
+        camber_change_per_roll: 0.0
+
+        # Damper damping ratio zeta = C/C_crit [-] - see basic_car.yaml for
+        # what this is for. Milliken p.810 puts "road-holding optimum" at
+        # ~0.5; authored between that and the passenger figure.
+        damping_ratio_front: 0.30
+        damping_ratio_rear: 0.30
+
+    limits:
+        max_speed: 85.0   # [m/s] = 306 km/h
+
+    wheels:
+        radius: 0.33      # unloaded radius R_u [m]
+        width: 0.28
+        inertia: 1.0      # NOT a KB value - see README, OQ-5
+
+    tire:
+        lateral_friction: 0.90
+        longitudinal_friction_ratio: 1.0    # pure-circle case - README, OQ-1
+        friction_load_sensitivity: 0.10
+        # Low-aspect-ratio performance radial. Gillespie Ch.10 quotes
+        # 0.25-0.30 and above for this class, against 0.15 for a normal radial.
+        # Note what this does now: the stiffer tyre saturates EARLIER, at about
+        # 9.6 deg of slip instead of 15.7. Milliken's race tyres, stiffer still,
+        # peak at 3-7 deg (p.24) - the trend is the source's own.
+        cornering_coefficient: 0.25
+        camber_stiffness_ratio: 0.10        # radial, Milliken p.727
+        load_sensitivity_b: 0.0             # no source gives it - README, OQ-2
+        peak_slip_ratio: 0.15
+        universal_curve: { b: 0.714, c: 1.40, d: 1.00, e: -0.20 }
+        aligning_moment_coefficient: 0.043
+        vertical_rate: 175127.0
+        relaxation_length_revolutions: 0.75
+        static_camber: 0.0
+
+    # Road load - the forces that slow a COASTING vehicle.
+    # low, slippery, small frontal area
+    road_load:
+        # Base rolling resistance coefficient [-]. Gillespie Ch.4 gives 0.015
+        # for a passenger car on concrete, 0.08 on medium-hard soil, 0.30 on
+        # sand. Grows mildly with speed (Eq. 4-14).
+        rolling_resistance: 0.014
+
+        # Drag coefficient [-]. Only meaningful together with frontal_area.
+        drag_coefficient: 0.31
+
+        # Frontal (projected) area [m^2] - the reference area for C_D.
+        frontal_area: 1.95
+
+        # Engine braking as deceleration per unit speed [1/s].
+        # NOT from Gillespie - a stand-in for overrun losses in gear.
+        # Set to 0 to coast like a car in neutral.
+        engine_braking: 0.01
+
+    # ---------------------------------------------------------------------
+    #  SOUND  --  the engine heard through EngineSim's own synthesiser
+    #  (audio/EngineSimSynth.h): firing events from the resolved engine's
+    #  firing order and valve timing, driving a waveguide model of this
+    #  exhaust. Keys are EngineSim's (the [exhaust], [intake] and [sound]
+    #  sections of an engine file); all AUTHORED. Delete `engine_sim:` and
+    #  the car is heard through audio/SoundSynth.h's own engine model.
+    # ---------------------------------------------------------------------
+    sound:
+        engine_sim:
+            exhaust_layout: single               # 4-into-1: an even pulse every 180 deg
+            exhaust_header_length_m: 0.50        # longer = lower pipe resonances
+            exhaust_mid_length_m: 1.20
+            exhaust_muffler_length_m: 0.40
+            exhaust_tail_length_m: 0.50
+            exhaust_muffler_area_ratio: 4.5      # bigger = quieter, more muffled
+            exhaust_muffler_body_hz: 135
+            exhaust_tip_damping: 0.30            # lower = brighter, raspier
+            intake_runner_length_m: 0.32
+            sound_cylinder_strength_spread: 0.15
+            sound_cylinder_timing_spread_deg: 3.0
+            sound_noise_seed: 1998086

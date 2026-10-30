@@ -1,0 +1,121 @@
+# Chevrolet 454 big-block V8 (7.4 L), cross-plane crank, 4-barrel carburettor,
+# dual exhaust, 4-speed manual.
+#
+# THIS ONE FILE DEFINES THE ENGINE: physics, animation and sound all read it.
+# Save the file while the dashboard is running and the changes apply within a
+# second (a mistake is shown in a red banner and the old settings keep running).
+# Check a file without the dashboard:   python -m engine_sim.engine_file config/engines/chevrolet_454.toml
+# Every setting is documented in README.md §3; comments below say what you will HEAR.
+
+id = "454"                   # short name for `--engine 454`
+name = "Chev. 454 V8"        # shown in the dashboard
+description = "Big-block V8 with dual exhaust: deep, lumpy, uneven per bank."
+
+# ------------------------------------------------------------------ engine
+[engine]
+# --- geometry
+bore_m = 0.10795             # 4.250 in.  Bigger bore = slower, deeper blowdown pulse
+stroke_m = 0.1016            # 4.000 in
+rod_length_m = 0.15583       # 6.135 in
+compression_ratio = 8.5
+num_cylinders = 8            # must match [layout]
+num_valves_per_cyl = 2       # pushrod OHV: 1 intake + 1 exhaust
+# --- rotating mass.  Heavier = smoother, steadier idle; lighter = lumpier, revs faster
+engine_inertia_kgm2 = 0.45   # big-block crank + 14" flywheel + clutch
+# --- speeds [rpm]
+idle_rpm = 650
+stall_rpm = 300              # below this (without the starter) the engine dies
+redline_rpm = 5500
+limiter_type = "fuel_cut"    # "fuel_cut" (bounces on the limiter) or "torque_cut"
+limiter_hysteresis_rpm = 150
+# --- air path
+max_volumetric_efficiency = 0.88
+manifold_volume_m3 = 0.007
+throttle_max_area_m2 = 0.0058          # 4-barrel, ~1.69 in bores
+use_manifold_dynamics = true
+use_resolved_cylinders = true   # crank-angle-resolved cylinders drive the engine (README §2.3); false = fast cycle-averaged model
+use_native_core = true         # run the substep loop in compiled C when a compiler is found (README §2.3); false = pure Python
+# --- idle control and decel fuel cut-off (engine braking)
+use_idle_air_control = true
+iac_feedforward = 0.009
+iac_resolved_gain_scale = 0.06  # resolved cylinders: the big manifold + cycle delay need softer idle-air gains than the default 0.15
+iac_max = 0.018
+dfco_enter_ratio = 1.5       # cut fuel on a throttle lift above 1.5 x idle rpm
+dfco_resume_ratio = 1.2
+# --- starter motor (torque at the crank)
+starter_stall_torque_nm = 300   # must beat the compression stroke of the resolved core (use_resolved_cylinders)
+starter_free_speed_rpm = 330
+
+# ------------------------------------------------------------------ layout
+[layout]
+firing_order = [1, 8, 4, 3, 6, 5, 7, 2]
+# Bank of each cylinder, cylinders 1..N.  GM numbering: odd cylinders left bank, even right.
+cylinder_bank = [0, 1, 0, 1, 0, 1, 0, 1]
+bank_angle_deg = 90          # angle between banks (0 = inline)
+# firing_intervals_deg = [90, 90, 90, 90, 90, 90, 90, 90]   # only for odd-fire engines; default even
+
+# ------------------------------------------------------------------ valve timing [crank degrees]
+[valves]
+intake_open_btdc_deg = 10    # before top dead centre
+intake_close_abdc_deg = 50   # after bottom dead centre
+exhaust_open_bbdc_deg = 50   # before BDC: earlier = louder, sharper bark
+exhaust_close_atdc_deg = 10
+# Valve sizes (per valve) and lift: approximate, for the resolved engine core
+# (use_resolved_cylinders). Bigger valves / more lift = more air at high rpm.
+intake_head_dia_m = 0.0556      # 2.19 in
+intake_port_dia_m = 0.0500
+intake_max_lift_m = 0.0125      # ~0.50 in at the valve
+exhaust_head_dia_m = 0.0478     # 1.88 in
+exhaust_port_dia_m = 0.0440
+exhaust_max_lift_m = 0.0125
+
+# ------------------------------------------------------------------ exhaust (sound)
+[exhaust]
+layout = "dual"              # "dual": one pipe per bank (stereo, uneven);  "single": banks merge
+# Backpressure (resolved core): the plenum every exhaust valve discharges into and
+# the equivalent single bore of the dual 2.5 in tail pipes (larger = less backpressure).
+plenum_volume_m3 = 0.030
+tail_dia_m = 0.085
+# Lengths per pipe: one number (all pipes) or one per pipe.  Longer = lower resonances.
+header_length_m = [0.85, 1.00]       # manifold primaries + collector
+mid_length_m = [1.25, 1.45]
+muffler_length_m = 0.45
+tail_length_m = [0.70, 0.80]
+muffler_area_ratio = 6.0     # chamber cross-section / pipe: bigger = quieter, more muffled
+muffler_body_hz = [110, 120] # boom of the muffler shell
+# Gas temperature in each section [K]; hotter gas = faster sound = higher pipe pitch
+header_temp_k = 725
+mid_temp_k = 622
+muffler_temp_k = 526
+tail_temp_k = 439
+pipe_loss = 0.992            # wall friction per pass: lower = pulses die faster
+tip_damping = 0.35           # open-end high-frequency loss: higher = duller, lower = brighter/rasper
+
+# ------------------------------------------------------------------ intake (sound)
+[intake]
+runner_length_m = 0.45
+runner_temp_k = 293
+
+# ------------------------------------------------------------------ sound character
+[sound]
+cylinder_strength_spread = 0.30      # fixed strength differences between cylinders: the idle "lope"
+cylinder_timing_spread_deg = 6.0     # fixed exhaust-timing differences between cylinders
+noise_seed = 1234567                 # different seed = different (repeatable) cylinder differences
+blowdown_k = 1.75                    # blowdown time constant = k * bore / gas speed
+crank_ripple_gain = 0.66             # how much cylinder work shows up as crank-speed ripple
+combustion_variability = 0.02        # random cycle-to-cycle strength variation (fraction)
+idle_variability = 0.065             # extra of it at closed throttle
+pop_probability = 0.05               # chance of an overrun pop per exhaust event
+starter_ratio = 11                   # starter armature revs per crank rev
+starter_poles = 4
+
+# ------------------------------------------------------------------ vehicle
+[vehicle]
+mass_kg = 1700
+wheel_radius_m = 0.335
+gear_ratios = [2.20, 1.64, 1.28, 1.00]   # Muncie M21 close-ratio
+final_drive = 3.73
+wheel_inertia_kgm2 = 4.5
+gearbox_inertia_kgm2 = 0.03
+cd_a_m2 = 0.95
+clutch_capacity_nm = 750

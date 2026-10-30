@@ -1,0 +1,118 @@
+# ===========================================================================
+#  SUV - long wheelbase, high CG, heavy.
+#
+#  The high CG has no effect under the kinematic bicycle model, which has no
+#  load transfer. Under the four-wheel model it dominates: longitudinal load
+#  transfer is governed by h/L and lateral transfer by h/t (Gillespie
+#  Section 3.2, 3.5), and this vehicle has the worst of both.
+#
+#  NOTE: this is NOT a rollover model. Gillespie Chapter 9 gives rollover
+#  thresholds of 0.8-1.1 g for a van and 0.9-1.1 g for a pickup, but the
+#  suspended and transient rollover models need roll stiffness and roll-axis
+#  geometry that no source quantifies. See README, Open Questions.
+# ===========================================================================
+
+vehicle:
+    name: "SUV"
+
+    mass: 2300.0
+
+    dimensions:
+        length: 4.9
+        width: 1.95
+        height: 1.78
+
+    # Long wheelbase: turns less sharply for the same steer angle, and needs
+    # more room. Compare the derived minimum turn radius in the UI.
+    wheelbase: 2.95
+
+    track:
+        front: 1.68
+        rear: 1.68
+
+    cg:
+        # Roughly three times the sports car's CG height. Under a model with
+        # load transfer this would dominate the vehicle's behaviour.
+        height: 0.72
+        front_weight_distribution: 0.52
+
+    steering:
+        max_angle: 33.0
+        steering_rate: 150.0    # slower rack, heavier steering
+
+    inertia:
+        yaw: 0.0        # 0 = documented fallback (README, OQ-5)
+
+    engine:
+        max_acceleration: 3.2   # [m/s^2] ~0.33 g
+
+    drivetrain:
+        layout: rear
+
+    brakes:
+        max_deceleration: 7.5   # [m/s^2] ~0.76 g
+        front_proportion: 0.0   # derive from Eq. 3-29/3-30
+
+    suspension:
+        # Softer than the saloon, which is what a tall family vehicle is.
+        ride_frequency_front: 1.15
+        ride_frequency_rear: 1.10
+        roll_centre_height_front: 0.0787   # Milliken worked-example values
+        roll_centre_height_rear: 0.1730
+        # Sized for Milliken Table 16.1's "soft: basic family transportation"
+        # row, 7.5 deg/g. The bars have to be large because this vehicle's
+        # sprung CG sits 0.65 m above its roll axis - the gravity term
+        # W_s*h_2 in the roll gradient denominator is correspondingly large,
+        # which is exactly Gillespie's point about high-CG vehicles rolling
+        # dramatically on soft springs.
+        anti_roll_rate_front: 28500.0
+        anti_roll_rate_rear: 11200.0
+        unsprung_fraction_driven: 0.15
+        unsprung_fraction_non_driven: 0.10
+        camber_change_per_roll: 0.0
+
+        # Damper damping ratio zeta = C/C_crit [-] - see basic_car.yaml for
+        # what this is for. Milliken p.810: passenger cars ~0.25.
+        damping_ratio_front: 0.25
+        damping_ratio_rear: 0.25
+
+    limits:
+        max_speed: 55.0   # [m/s] = 198 km/h
+
+    wheels:
+        radius: 0.38      # unloaded radius R_u [m]
+        width: 0.26
+        inertia: 1.8      # NOT a KB value - see README, OQ-5
+
+    tire:
+        lateral_friction: 0.90
+        longitudinal_friction_ratio: 1.0    # pure-circle case - README, OQ-1
+        friction_load_sensitivity: 0.10
+        cornering_coefficient: 0.15         # ordinary radial, Gillespie Ch.10
+        camber_stiffness_ratio: 0.10        # radial, Milliken p.727
+        load_sensitivity_b: 0.0             # no source gives it - README, OQ-2
+        peak_slip_ratio: 0.15
+        universal_curve: { b: 0.714, c: 1.40, d: 1.00, e: -0.20 }
+        aligning_moment_coefficient: 0.043
+        vertical_rate: 175127.0
+        relaxation_length_revolutions: 0.75
+        static_camber: 0.0
+
+    # Road load - the forces that slow a COASTING vehicle.
+    # tall and blunt - a big drag penalty
+    road_load:
+        # Base rolling resistance coefficient [-]. Gillespie Ch.4 gives 0.015
+        # for a passenger car on concrete, 0.08 on medium-hard soil, 0.30 on
+        # sand. Grows mildly with speed (Eq. 4-14).
+        rolling_resistance: 0.016
+
+        # Drag coefficient [-]. Only meaningful together with frontal_area.
+        drag_coefficient: 0.38
+
+        # Frontal (projected) area [m^2] - the reference area for C_D.
+        frontal_area: 2.85
+
+        # Engine braking as deceleration per unit speed [1/s].
+        # NOT from Gillespie - a stand-in for overrun losses in gear.
+        # Set to 0 to coast like a car in neutral.
+        engine_braking: 0.014

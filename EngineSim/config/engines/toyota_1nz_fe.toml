@@ -1,0 +1,104 @@
+# Toyota 1NZ-FE 1.5 L inline-4 in a small hatchback, 5-speed manual, single exhaust.
+#
+# THIS ONE FILE DEFINES THE ENGINE: physics, animation and sound all read it.
+# Save the file while the dashboard is running and the changes apply within a
+# second (a mistake is shown in a red banner and the old settings keep running).
+# Check a file without the dashboard:   python -m engine_sim.engine_file config/engines/toyota_1nz_fe.toml
+# Every setting is documented in README.md §3; comments below say what you will HEAR.
+
+id = "1nz"
+name = "1NZ-FE 1.5L I4"
+description = "Small inline-4 with one exhaust: light, even, revvy."
+
+[engine]
+bore_m = 0.075               # 75.0 mm
+stroke_m = 0.0847            # 84.7 mm  ->  1.497 L
+rod_length_m = 0.1325
+compression_ratio = 10.5          # real 1NZ-FE figure
+num_cylinders = 4
+num_valves_per_cyl = 4       # DOHC 16-valve: 2 intake + 2 exhaust
+engine_inertia_kgm2 = 0.10   # crank + flywheel + clutch
+idle_rpm = 800
+stall_rpm = 350
+redline_rpm = 6400
+limiter_type = "fuel_cut"
+limiter_hysteresis_rpm = 150
+throttle_max_area_m2 = 0.0022          # ~55 mm throttle body
+use_manifold_dynamics = true
+use_resolved_cylinders = true   # crank-angle-resolved cylinders drive the engine (README §2.3); false = fast cycle-averaged model
+use_native_core = true         # run the substep loop in compiled C when a compiler is found (README §2.3); false = pure Python
+use_idle_air_control = true
+iac_feedforward = 0.006
+dfco_enter_ratio = 1.5
+dfco_resume_ratio = 1.2
+starter_stall_torque_nm = 200   # must beat the compression stroke of the resolved core (use_resolved_cylinders)
+
+[layout]
+firing_order = [1, 3, 4, 2]
+cylinder_bank = [0, 0, 0, 0]
+bank_angle_deg = 0
+
+[valves]
+intake_open_btdc_deg = 10
+intake_close_abdc_deg = 50
+exhaust_open_bbdc_deg = 50
+exhaust_close_atdc_deg = 10
+# Variable valve timing (Toyota VVT-i: intake cam only). The ECU holds the cam at its
+# minimum at idle and light load, brings it in at mid speed and load, and backs it out
+# toward redline (README §2.3). Degrees of cam advance = valve events earlier.
+vvt_intake_min_deg = 0
+vvt_intake_max_deg = 35
+# Valve sizes (per valve) and lift: approximate, for the resolved engine core
+# (use_resolved_cylinders). Bigger valves / more lift = more air at high rpm.
+intake_head_dia_m = 0.0275
+intake_port_dia_m = 0.0250
+intake_max_lift_m = 0.0080
+exhaust_head_dia_m = 0.0235
+exhaust_port_dia_m = 0.0215
+exhaust_max_lift_m = 0.0080
+
+[exhaust]
+layout = "single"
+# Backpressure (resolved core): the plenum the exhaust valves discharge into and the
+# tail-pipe bore (smaller = more backpressure, more pumping loss).
+plenum_volume_m3 = 0.012
+tail_dia_m = 0.048
+header_length_m = 0.55       # 4-into-1 manifold + collector
+mid_length_m = 1.10
+muffler_length_m = 0.40
+tail_length_m = 0.90
+muffler_area_ratio = 5.0
+muffler_body_hz = 125
+header_temp_k = 725
+mid_temp_k = 622
+muffler_temp_k = 526
+tail_temp_k = 439
+pipe_loss = 0.992
+tip_damping = 0.35
+
+[intake]
+runner_length_m = 0.35
+runner_temp_k = 293
+
+[sound]
+cylinder_strength_spread = 0.30
+cylinder_timing_spread_deg = 6.0
+noise_seed = 1234567
+blowdown_k = 1.75
+crank_ripple_gain = 0.66
+combustion_variability = 0.02
+idle_variability = 0.05
+pop_probability = 0.03
+starter_ratio = 11
+starter_poles = 4
+
+[vehicle]
+mass_kg = 1150
+wheel_radius_m = 0.29
+gear_ratios = [3.545, 1.904, 1.310, 1.031, 0.815]
+final_drive = 4.312
+wheel_inertia_kgm2 = 3.2
+gearbox_inertia_kgm2 = 0.01
+cd_a_m2 = 0.66
+rolling_resistance = 0.012
+clutch_capacity_nm = 260

@@ -1,0 +1,141 @@
+# Nissan GT-R R35 / VR38DETT-inspired V6
+# 3.8 L twin-turbo V6, cross-plane-style simulation timing,
+# dual exhaust, 6-speed-style gearing.
+#
+# Tuned for a smooth but aggressive turbocharged V6 character:
+# deep low-frequency pulses, pronounced boost/exhaust presence,
+# and a sharper high-rpm note than the Chevrolet 454.
+
+id = "vr38"
+name = "Nissan GT-R VR38DETT"
+description = "3.8 L twin-turbo V6 with dual exhaust: smooth idle, deep pulses, aggressive high-rpm note."
+
+[engine]
+bore_m = 0.0955
+stroke_m = 0.0884
+rod_length_m = 0.154
+compression_ratio = 9.0
+num_cylinders = 6
+num_valves_per_cyl = 4       # DOHC 24-valve: 2 intake + 2 exhaust
+
+engine_inertia_kgm2 = 0.16
+
+idle_rpm = 750
+stall_rpm = 450
+redline_rpm = 7000
+limiter_type = "fuel_cut"
+limiter_hysteresis_rpm = 150
+
+max_volumetric_efficiency = 1.15
+manifold_volume_m3 = 0.004
+throttle_max_area_m2 = 0.0045
+use_manifold_dynamics = true
+use_resolved_cylinders = true
+use_native_core = true         # run the substep loop in compiled C when a compiler is found (README §2.3); false = pure Python
+# Twin turbochargers, modelled as one turbo with the flow, area and inertia of the pair
+# (README §2.3). Boost is held at the target by the wastegate; spool-up (lag) comes from
+# the shaft inertia and the exhaust energy, and the turbine is what sets the backpressure.
+use_turbo = true
+turbo_count = 2
+turbo_target_boost_pa = 200000      # absolute (about 1.0 bar gauge)
+turbo_wastegate_gain = 1.0
+turbo_turbine_area_m2 = 7.0e-4      # effective flow area of both turbines together
+turbo_wastegate_area_m2 = 1.2e-3    # both wastegates, fully open   # crank-angle-resolved cylinders drive the engine (README §2.3); false = fast cycle-averaged model
+
+use_idle_air_control = true
+iac_feedforward = 0.009
+iac_max = 0.014
+
+dfco_enter_ratio = 1.5
+dfco_resume_ratio = 1.2
+
+starter_stall_torque_nm = 250   # must beat the compression stroke of the resolved core (use_resolved_cylinders)
+starter_free_speed_rpm = 300
+
+[layout]
+# Even-fire 60-degree V6-style sequence
+firing_order = [1, 4, 2, 5, 3, 6]
+
+# 1-3-5 left, 2-4-6 right
+cylinder_bank = [0, 1, 0, 1, 0, 1]
+bank_angle_deg = 60
+
+[valves]
+intake_open_btdc_deg = 8
+intake_close_abdc_deg = 42
+exhaust_open_bbdc_deg = 48
+exhaust_close_atdc_deg = 8
+# Variable valve timing on the intake cams (see toyota_1nz_fe.toml).
+vvt_intake_min_deg = 0
+vvt_intake_max_deg = 25
+# Valve sizes (per valve) and lift: approximate, for the resolved engine core
+# (use_resolved_cylinders). Bigger valves / more lift = more air at high rpm.
+intake_head_dia_m = 0.0345
+intake_port_dia_m = 0.0310
+intake_max_lift_m = 0.0105
+exhaust_head_dia_m = 0.0290
+exhaust_port_dia_m = 0.0265
+exhaust_max_lift_m = 0.0105
+
+[exhaust]
+layout = "dual"
+# Backpressure (resolved core): the plenum the exhaust valves discharge into and the
+# equivalent single bore of the dual tail pipes (larger = less backpressure).
+plenum_volume_m3 = 0.020
+tail_dia_m = 0.095
+
+# Shorter turbo/exhaust system gives a sharper, more metallic sound.
+header_length_m = [0.55, 0.60]
+mid_length_m = [1.05, 1.10]
+muffler_length_m = 0.35
+tail_length_m = [0.65, 0.70]
+
+muffler_area_ratio = 4.0
+muffler_body_hz = [135, 145]
+
+# Turbocharged exhaust is relatively hot.
+header_temp_k = 850
+mid_temp_k = 720
+muffler_temp_k = 570
+tail_temp_k = 470
+
+pipe_loss = 0.995
+tip_damping = 0.22
+
+[intake]
+runner_length_m = 0.30
+runner_temp_k = 330
+
+[sound]
+# Much less cylinder-to-cylinder variation than the old big-block.
+cylinder_strength_spread = 0.08
+cylinder_timing_spread_deg = 2.0
+
+noise_seed = 3847261
+
+blowdown_k = 1.35
+crank_ripple_gain = 0.30
+combustion_variability = 0.012
+idle_variability = 0.025
+
+# Occasional turbo/exhaust-style overrun pops.
+pop_probability = 0.025
+
+starter_ratio = 11
+starter_poles = 4
+
+[vehicle]
+mass_kg = 1740
+wheel_radius_m = 0.365
+
+# R35-style six-speed manual approximation.
+gear_ratios = [3.827, 2.360, 1.685, 1.312, 1.000, 0.793]
+
+final_drive = 3.70
+
+wheel_inertia_kgm2 = 5.0
+gearbox_inertia_kgm2 = 0.04
+
+cd_a_m2 = 0.85
+
+clutch_capacity_nm = 800

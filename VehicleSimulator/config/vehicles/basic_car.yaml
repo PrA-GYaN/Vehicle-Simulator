@@ -1,0 +1,267 @@
+# ===========================================================================
+#  Basic car - a mid-size family saloon.
+#
+#  Units: metres, kilograms, seconds. Angles in DEGREES (converted on load).
+# ===========================================================================
+
+vehicle:
+    name: "BasicCar"
+
+    # Total vehicle mass [kg]. Used by every force balance in the four-wheel
+    # model (Gillespie Eq. 1-1) and by every load-transfer term. The kinematic
+    # bicycle model ignores it.
+    mass: 1500.0
+
+    # Yaw moment of inertia about the CG [kg.m^2].
+    #
+    # *** NOT A KNOWLEDGE BASE VALUE. *** Neither source gives a yaw radius of
+    # gyration for any vehicle - see README, Open Questions (OQ-5). Leave at 0
+    # to use the documented fallback m*b*c, or author a measured value here.
+    inertia:
+        yaw: 0.0
+
+    dimensions:
+        length: 4.5     # [m] bumper to bumper
+        width: 1.8      # [m]
+        height: 1.4     # [m] ground to roof
+
+    # Front axle to rear axle [m]. This is L in yaw_rate = (v/L)*tan(delta),
+    # and is the single most influential parameter in the kinematic model.
+    wheelbase: 2.7
+
+    track:
+        front: 1.55     # [m] lateral wheel spacing
+        rear: 1.55
+
+    cg:
+        height: 0.55                      # [m] above ground
+        front_weight_distribution: 0.55   # fraction of static weight on the front
+
+    steering:
+        max_angle: 35.0       # [deg] road wheel angle at full lock
+        steering_rate: 180.0  # [deg/s] actuator slew rate
+
+    engine:
+        # Tractive force DEMAND, expressed as the acceleration it would give
+        # an unresisted vehicle: F = mass * this. It is a demand, not an
+        # outcome - the tyres decide how much of it reaches the road.
+        # There is no engine torque map, and there cannot be one: the
+        # Knowledge Base records it as gap G17 (see README, Open Questions).
+        max_acceleration: 4.0   # [m/s^2] ~0.41 g
+
+    drivetrain:
+        # front | rear. Gillespie Section 5.7.3 derives the traction limit
+        # separately for each, and they differ in sign of the load-transfer
+        # term: rear drive gains load as it accelerates, front drive loses it.
+        # All-wheel drive is NOT offered - neither source models a torque split
+        # (gap G19).
+        layout: rear
+
+    brakes:
+        # Total brake force demand, as a deceleration: F = mass * this.
+        max_deceleration: 8.0   # [m/s^2] ~0.82 g, typical dry-road capability
+
+        # Fraction of that force sent to the front axle.
+        # 0 = derive the ideal proportioning from Gillespie Eq. 3-29/3-30 at
+        # the tyre's peak friction, i.e. the split that locks both axles at
+        # once on the surface the brakes were designed for. On any lower-mu
+        # surface the rear will then lock first, which is exactly what
+        # Section 6.8.2 says a fixed proportioning must do.
+        front_proportion: 0.0
+
+    # -----------------------------------------------------------------------
+    #  SUSPENSION - the roll chain
+    #
+    #  ride frequency -> ride rate -> roll rate -> roll gradient -> lateral
+    #  load transfer, in three terms (Milliken & Milliken Ch.16 and Ch.18).
+    #
+    #  This replaces what used to be a single authored "roll stiffness front
+    #  fraction". The front/rear split of load transfer is now COMPUTED, and it
+    #  is deliberately NOT the same number as the roll rate distribution -
+    #  Milliken p.679 calls confusing the two a named error, worth ten
+    #  percentage points in their own example. Both are shown in the UI.
+    # -----------------------------------------------------------------------
+    suspension:
+        # Undamped ride natural frequency [Hz].
+        # Milliken p.582: passenger cars 30-50 cpm (0.50-0.83 Hz), sports cars
+        # 70-90 cpm (1.17-1.50 Hz). Gillespie's Olley criterion puts the body
+        # natural frequency at 1.3 Hz or below. The two bands barely overlap -
+        # see README, Open Questions (OQ-4) - and these values sit inside
+        # Gillespie's bound, above Milliken's passenger band.
+        ride_frequency_front: 1.25
+        ride_frequency_rear: 1.20
+
+        # Roll centre heights above ground [m]. This is the GEOMETRIC path of
+        # lateral load transfer - instantaneous, needing no roll motion.
+        # Milliken gives only worked-EXAMPLE values, never a typical range;
+        # these are 3.1 in and 6.8 in from the Ch.16 second example.
+        # See README, Open Questions (OQ-4).
+        roll_centre_height_front: 0.0787
+        roll_centre_height_rear: 0.1730
+
+        # Anti-roll bar roll rate [N.m/rad of body roll]. Milliken Ch.16
+        # supplies this - it was Knowledge Base gap G14, OPEN until then.
+        #
+        # Both ends of this number come from the Knowledge Base: the value is
+        # the one that puts the resulting ROLL GRADIENT on Milliken Table 16.1's
+        # figure for this class of car ("semi-soft: contemporary middle-market
+        # sedans", 7.0 deg/g), while keeping the front load transfer
+        # distribution near the weight distribution + 5 % that Milliken p.604
+        # recommends as a starting point. Achieved: 6.8 deg/g, 59 % front.
+        anti_roll_rate_front: 9100.0
+        anti_roll_rate_rear: 0.0
+
+        # Unsprung weight per axle, as a fraction of that axle's load.
+        # Gillespie p.164: ~10 % of GAWR non-driven, ~15 % driven. The model
+        # picks between them from the drive layout above.
+        unsprung_fraction_driven: 0.15
+        unsprung_fraction_non_driven: 0.10
+
+        # Camber change of the wheel relative to the BODY per unit body roll
+        # [rad/rad]. 0 = no camber compensation, so the wheel leans with the
+        # body and the loaded outside tyre gains positive camber.
+        # NOT QUANTIFIED BY ANY SOURCE: Gillespie Eq. 6-51 leaves the
+        # characteristic unspecified and Milliken's arctan(1/fvsa) rate needs
+        # an fvsa length no source gives. See README, Open Questions (OQ-5).
+        camber_change_per_roll: 0.0
+
+        # Damper damping ratio zeta = C/C_crit [-], used only by the terrain-
+        # following quarter-car model (src/environment/TerrainHeightField.h)
+        # when driving on an imported terrain model - inert on every
+        # procedural track. Milliken p.810: passenger cars ~0.25.
+        damping_ratio_front: 0.25
+        damping_ratio_rear: 0.25
+
+    limits:
+        max_speed: 60.0   # [m/s] = 216 km/h
+
+    wheels:
+        # UNLOADED tyre radius R_u [m]. No longer visual only: the loaded and
+        # effective rolling radii are derived from it and the load
+        # (Blundell & Harty Eq. 5.11).
+        radius: 0.34
+        width: 0.22     # [m] visual only
+
+        # Rotational inertia of one wheel-and-tyre assembly [kg.m^2].
+        #
+        # *** NOT A KNOWLEDGE BASE VALUE. *** I_w appears in Gillespie
+        # Eq. 3-18 but no source gives a magnitude. It cannot be omitted:
+        # wheel lock and wheel spin ARE the wheel's rotational dynamics.
+        # See README, Open Questions (OQ-5).
+        inertia: 1.2
+
+    # -----------------------------------------------------------------------
+    #  TYRE  -  the nondimensional combined-slip model
+    #
+    #  Milliken & Milliken Ch.14, Eqs. (14.1)-(14.21). Every quantity is
+    #  normalised by the friction-limited force and the initial stiffness, and
+    #  then ONE universal curve fits normalised lateral force, camber thrust,
+    #  longitudinal force AND the combined resultant. That single fact is what
+    #  makes combined braking-and-cornering computable rather than merely
+    #  bounded.
+    #
+    #  Coefficients are per DEGREE and angles in DEGREES, because that is how
+    #  the Knowledge Base quotes every one of them. Converted on load.
+    # -----------------------------------------------------------------------
+    tire:
+        # Lateral friction coefficient mu_y. Gillespie: dry 0.70-0.90, wet
+        # 0.25-0.50, ice 0.10-0.15. Milliken adds measured race tyres at
+        # 1.10 / 1.06 / 0.96 for 900 / 1350 / 1800 lb, and a Grand Prix tyre
+        # "up to 1.8 at light load".
+        #
+        # Drop this to 0.35 to see the rear axle lock first under braking, and
+        # to 0.15 for ice, where the peak sits at only a few percent slip.
+        lateral_friction: 0.90
+
+        # mu_x / mu_y. Milliken names mu_x as a required parameter and gives no
+        # value for any tyre. 1.0 is Gillespie's explicitly named "pure-circle
+        # case" - the friction boundary is a circle rather than an ellipse.
+        # See README, Open Questions (OQ-1).
+        longitudinal_friction_ratio: 1.0
+
+        # mu falls ~0.01 for each 10 % increase in load near the rated load
+        # (Gillespie 2.4.3) => 0.10 per unit relative load. Milliken calls the
+        # same effect "tire load sensitivity" and says it "has a major effect
+        # on the balance (plow/spin) of a race car operating near the limit",
+        # but gives only plotted curves - so Gillespie's rule is what is used.
+        friction_load_sensitivity: 0.10
+
+        # Cornering coefficient C_alpha/Fz in 1/deg. Gillespie Ch.10:
+        # bias-ply 0.12, radial 0.15, performance radial 0.25-0.30+.
+        #
+        # This now also FIXES where the tyre saturates: the universal curve
+        # peaks at a known normalised slip, so the peak slip ANGLE follows from
+        # this and mu_y. With these values it lands at about 15.7 deg, against
+        # the "roughly ten to fifteen degrees" Gillespie's charts show.
+        cornering_coefficient: 0.15
+
+        # Camber stiffness as a fraction of cornering stiffness.
+        # Milliken p.46 / p.727: radial about 1/10, bias-ply 1/5 to 1/6.
+        # Gillespie gave only an undifferentiated "10-20 % of C_alpha".
+        camber_stiffness_ratio: 0.10
+
+        # Quadratic coefficient b of C_alpha = a*Fz - b*Fz^2 (Eq. 6-36),
+        # in 1/(N.rad). No source gives a number - Gillespie calls a and b
+        # "vehicle/tyre specific" and Milliken supplies stiffnesses at single
+        # loads only. 0 collapses the polynomial onto the Knowledge Base's own
+        # simpler statement C_alpha = coefficient * Fz.
+        # See README, Open Questions (OQ-2).
+        load_sensitivity_b: 0.0
+
+        # Slip ratio at which longitudinal force peaks. Milliken pp.37-38:
+        # 0.10-0.15 in the text, ~0.18 read from the figures; Gillespie Ch.10
+        # gives 15-20 % on dry and "a few percent" on ice.
+        #
+        # This is not a shape parameter. It is what the longitudinal slip
+        # stiffness k_x is DERIVED from, against the universal curve's peak -
+        # which is why k_x is no longer authored here.
+        peak_slip_ratio: 0.15
+
+        # The universal curve, Milliken Eqs. (14.5)-(14.7). These are the
+        # source's own fitted values for the P195/70R-14, fitted to data at
+        # five loads simultaneously (p.476).
+        universal_curve:
+            b: 0.714
+            c: 1.40
+            d: 1.00
+            e: -0.20
+
+        # Aligning moment per unit load per degree of slip [ft-lb/lb/deg].
+        # Gillespie Ch.10: bias-ply 0.033, radial 0.043. The pneumatic trail is
+        # derived from this and the cornering coefficient, not authored.
+        aligning_moment_coefficient: 0.043
+
+        # Tyre vertical rate [N/m]. Gillespie's worked example is 1000 lb/in;
+        # Milliken uses 2000 lb/in in all three of his. Neither is a measured
+        # range. This is Gillespie's, converted.
+        vertical_rate: 175127.0
+
+        # Relaxation length in tyre revolutions. Gillespie Ch.10: "one-half to
+        # one tyre revolution" to reach 63 % of the steady-state lateral force.
+        # Milliken has no tyre transient content at all.
+        relaxation_length_revolutions: 0.75
+
+        # Static camber [deg], negative = tops leaning inboard. Milliken gives
+        # the camber that maximises peak lateral force as about -5 deg for
+        # modern wide radials, but that is a race figure for a cambered test
+        # tyre rather than a road-car alignment, so the default is zero.
+        static_camber: 0.0
+
+    # Road load - the forces that slow a COASTING vehicle.
+    # family saloon
+    road_load:
+        # Base rolling resistance coefficient [-]. Gillespie Ch.4 gives 0.015
+        # for a passenger car on concrete, 0.08 on medium-hard soil, 0.30 on
+        # sand. Grows mildly with speed (Eq. 4-14).
+        rolling_resistance: 0.015
+
+        # Drag coefficient [-]. Only meaningful together with frontal_area.
+        drag_coefficient: 0.32
+
+        # Frontal (projected) area [m^2] - the reference area for C_D.
+        frontal_area: 2.2
+
+        # Engine braking as deceleration per unit speed [1/s].
+        # NOT from Gillespie - a stand-in for overrun losses in gear.
+        # Set to 0 to coast like a car in neutral.
+        engine_braking: 0.012

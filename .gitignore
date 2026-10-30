@@ -1,0 +1,7 @@
+build/
+__pycache__/
+.pytest_cache/
+*.pyc
+EngineSim/output/
+VehicleSimulator/logs/*
+!VehicleSimulator/logs/.gitkeep
